@@ -13,7 +13,7 @@
  *
  * @depends shared/decoder
  * @usedBy server/serve
- * @exports HTTP_ROUTES, checkToken, readJsonBody, createHttpHandler
+ * @exports HTTP_ROUTES, checkToken, readJsonBody, corsHeaders, createHttpHandler
  * @ai.tags http, bridge
  * @ai.hint io
  */
@@ -27,9 +27,28 @@ const textOf = (value) => (typeof value === 'string' ? value : '');
 export const HTTP_ROUTES = Object.freeze([
     Object.freeze({ method: 'GET', path: '/health', auth: false, name: 'health' }),
     Object.freeze({ method: 'GET', path: '/v1/tools', auth: true, name: 'tools' }),
+    Object.freeze({ method: 'GET', path: '/v1/serves', auth: true, name: 'serves' }),
     Object.freeze({ method: 'POST', path: '/v1/complete', auth: true, name: 'complete' }),
     Object.freeze({ method: 'POST', path: '/v1/structure', auth: true, name: 'structure' }),
 ]);
+
+/**
+ * The headers of the CORS.
+ *
+ * The server listens on 127.0.0.1 and every route under `/v1` needs the token, so the
+ * extensions of the editor may read the answers from their own page.
+ * @returns {Record<string, string>}
+ * @exports
+ * @ai.hint pure
+ */
+export function corsHeaders() {
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-AI-Serve-Token',
+        'Access-Control-Max-Age': '600',
+    };
+}
 
 /**
  * Answer with a JSON body.
@@ -123,8 +142,9 @@ export async function readJsonBody(req, maxBytes = 8 * 1024 * 1024) {
  * The handler answers the requests of the routes of `HTTP_ROUTES` and returns `false`
  * for everything else, so that the caller may answer in its own way.
  *
- * @param {{ tokens?: string[], tools?: object[]|Function, onComplete?: Function|null,
- *           onStructure?: Function|null, onHealth?: Function|null, maxBodyBytes?: number }} [options]
+ * @param {{ tokens?: string[], tools?: object[]|Function, serves?: object[]|Function,
+ *           onComplete?: Function|null, onStructure?: Function|null, onHealth?: Function|null,
+ *           maxBodyBytes?: number }} [options]
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<boolean>}
  * @exports
  * @ai.hint io
@@ -132,12 +152,15 @@ export async function readJsonBody(req, maxBytes = 8 * 1024 * 1024) {
 export function createHttpHandler({
     tokens = [],
     tools = [],
+    serves = [],
     onComplete = null,
     onStructure = null,
     onHealth = null,
     maxBodyBytes = 8 * 1024 * 1024,
 } = {}) {
     return async function handle(req, res) {
+        for (const [name, value] of Object.entries(corsHeaders())) res.setHeader(name, value);
+
         let pathname = '/';
         try {
             pathname = new URL(String(req?.url ?? '/'), 'http://127.0.0.1').pathname;
@@ -146,6 +169,14 @@ export function createHttpHandler({
 
         const route = HTTP_ROUTES.find((item) => item.path === pathname);
         if (!route) return false;
+
+        // The preflight of the browser: the headers are enough, the body is empty.
+        if (method === 'OPTIONS') {
+            res.writeHead(204);
+            res.end();
+            return true;
+        }
+
         if (route.method !== method) {
             respondJson(res, 405, { error: { code: 'method_not_allowed', message: `${route.method} is the method of ${route.path}.` } });
             return true;
@@ -169,6 +200,12 @@ export function createHttpHandler({
         if (route.name === 'tools') {
             const list = typeof tools === 'function' ? await tools() : tools;
             respondJson(res, 200, { tools: Array.isArray(list) ? list : [] });
+            return true;
+        }
+
+        if (route.name === 'serves') {
+            const list = typeof serves === 'function' ? await serves() : serves;
+            respondJson(res, 200, { serves: Array.isArray(list) ? list : [] });
             return true;
         }
 

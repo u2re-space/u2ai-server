@@ -158,7 +158,8 @@ function connectionHandler({ hub, onComplete, tokens }) {
  * @param {{ home: string, config?: object|null, port?: number, host?: string, token?: string,
  *           onConnection?: Function|null, hub?: object|null, onRequest?: Function|null,
  *           onUpgrade?: Function|null, onComplete?: Function|null, onStructure?: Function|null,
- *           tools?: object[]|Function, mcp?: object|null, writeFile?: boolean, file?: string|null }} [options]
+ *           tools?: object[]|Function, serves?: object[]|Function, mcp?: object|null,
+ *           writeFile?: boolean, file?: string|null }} [options]
  * @returns {Promise<{ url: string, httpURL: string, port: number, token: string, file: string|null,
  *           record: object, close: () => Promise<void> }>}
  * @exports
@@ -177,6 +178,7 @@ export async function startServe({
     onComplete = null,
     onStructure = null,
     tools = [],
+    serves = null,
     mcp = null,
     writeFile: write = true,
     file = null,
@@ -193,10 +195,35 @@ export async function startServe({
         }
     }
 
+    // The state of this server: the route `/v1/serves` reads it when it is asked.
+    const state = { url: null, httpURL: null, startedAt: null };
+    const listServes = async () => {
+        const list = [{
+            name: 'self',
+            url: state.url,
+            httpURL: state.httpURL,
+            pid: process.pid,
+            protocol: PROTOCOL_VERSION,
+            status: 'running',
+            startedAt: state.startedAt,
+        }];
+        for (const service of Array.isArray(config?.services) ? config.services : []) {
+            if (!service || typeof service !== 'object') continue;
+            list.push({
+                name: typeof service.name === 'string' ? service.name : null,
+                url: service.url ?? null,
+                httpURL: service.httpURL ?? service.url ?? null,
+                status: 'configured',
+            });
+        }
+        return list;
+    };
+
     const tokens = [token, ...(Array.isArray(config?.completion?.tokens) ? config.completion.tokens : [])];
     const http = onRequest ?? createHttpHandler({
         tokens,
         tools,
+        serves: serves ?? listServes,
         onComplete,
         onStructure,
         maxBodyBytes: config?.limits?.maxBodyBytes ?? 8 * 1024 * 1024,
@@ -237,6 +264,9 @@ export async function startServe({
         protocol: PROTOCOL_VERSION,
         startedAt: new Date().toISOString(),
     };
+    state.url = listener.url;
+    state.httpURL = listener.httpURL;
+    state.startedAt = record.startedAt;
     if (target && write) await writeServeRecord(target, record);
 
     let closed = false;

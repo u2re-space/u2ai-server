@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 14 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине).
+> Актуальный статус: **шаг 15 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -261,10 +261,12 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/processing.test.js` — 19 тестов: захват обработки, маршрутизация запроса, ответ, таймаут, локальное исполнение
 
 ### step-15 — HTTP-API для расширений
-- [ ] `src/server/http.js` — `GET /health`, `GET /v1/tools`, `POST /v1/complete`, `POST /v1/structure` (заглушка), `GET /v1/serves`
-- [ ] Токен в заголовке `Authorization: Bearer` и в query; без токена — 401
-- [ ] `src/server/http.js` — CORS для локальных расширений, лимит тела запроса
-- [ ] `test/http.test.js` — маршруты, коды, проверка токена
+- [x] `src/server/http.js` — `GET /health`, `GET /v1/tools`, `POST /v1/complete`, `POST /v1/structure` (заглушка), `GET /v1/serves`
+- [x] Токен в заголовке `Authorization: Bearer` и в query; без токена — 401
+- [x] `src/server/http.js` — CORS для локальных расширений, лимит тела запроса
+- [x] `src/server/serve.js` — `/v1/serves`: этот сервер и внешние сервисы из конфига
+- [x] `src/cli.js` — команда `tools`: список инструментов пакета с категорией и риском
+- [x] `test/http.test.js` — 21 тест: маршруты, коды, проверка токена, CORS, лимит тела
 
 ### step-16 — Внешние AI-сервисы и утилиты
 - [ ] `src/client/proxy.js` — запуск и сопровождение внешних процессов по протоколу `ai-serve`

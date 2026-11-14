@@ -21,6 +21,7 @@ import { createHub } from './server/u2ai.js';
 import { createMcpServer, startStdioServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { createClient } from './openai/client.js';
 import { completeAtCursor } from './agent/autocomplete.js';
+import { TOOL_NAMES, TOOL_SPECS, toolAllowed } from './tools/tools.js';
 import { ROLE_NAMES, runRole, runAgent } from './roles/index.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
@@ -155,6 +156,15 @@ async function commandServe(opts) {
             token,
             hub,
             onComplete,
+            // The list of the tools of the configuration: the model sees the same list.
+            tools: TOOL_NAMES
+                .filter((name) => toolAllowed(name, config))
+                .map((name) => ({
+                    name,
+                    category: TOOL_SPECS[name].category,
+                    risk: TOOL_SPECS[name].risk,
+                    description: TOOL_SPECS[name].description,
+                })),
             // The MCP endpoint of the server: the same port and the same token.
             mcp: createMcpServer({ root: cwd, config }),
         });
@@ -397,6 +407,44 @@ function printRoleResult(role, out, asJson) {
 }
 
 /**
+ * The `tools` command: the tools of the package, with their category and their risk.
+ *
+ * The list is the one of the configuration: a tool that the configuration forbids is not
+ * printed, because the model does not see it either.
+ *
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandTools(opts) {
+    let config = null;
+    try {
+        config = await loadConfig({
+            configPath: opts.configPath,
+            cwd: opts.cwd ? path.resolve(opts.cwd) : process.cwd(),
+        });
+    } catch {
+        // The list of the tools does not need the configuration: the defaults are enough.
+    }
+    const list = TOOL_NAMES
+        .filter((name) => toolAllowed(name, config))
+        .map((name) => ({
+            name,
+            category: TOOL_SPECS[name].category,
+            risk: TOOL_SPECS[name].risk,
+            description: TOOL_SPECS[name].description,
+        }));
+    if (opts.json) {
+        console.log(JSON.stringify(list, null, 2));
+        return EXIT.ok;
+    }
+    for (const tool of list) {
+        console.log(`${tool.name.padEnd(18)} ${tool.category.padEnd(6)} ${tool.risk}`);
+    }
+    return EXIT.ok;
+}
+
+/**
  * The `complete` command: one completion for a file and a line, printed to the stdout.
  *
  * The cursor is at the end of the line: the command continues the line, as the Tab of the
@@ -495,6 +543,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (opts.command === 'agent') {
         return await commandAgent(opts);
+    }
+    if (opts.command === 'tools') {
+        return await commandTools(opts);
     }
     if (opts.command === 'complete') {
         return await commandComplete(opts);
