@@ -175,6 +175,11 @@ tool with the same name: the tool `read_file` of the client `vscode` is `vscode_
 The server keeps the catalog of every client, and the MCP server publishes it. A client
 that is gone takes its tools with it.
 
+The VSCode extension is such a client: it publishes the tools of the workspace of the
+editor — the files, the search, the terminal — and the server calls them back with the
+frame `tool.call`. Any other AI system may take them through the MCP server of the
+package, and the extension may serve them over stdio on its own.
+
 The events of a run are `text.delta`, `text.done`, `reasoning.delta`, `tool.exec.start`,
 `tool.exec.done`, `warning`, `error`, `image.saved`, `image.progress`, `response.done`,
 `approval.pending`, `question.pending`, `processing.held`, `processing.claimed`,

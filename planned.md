@@ -330,6 +330,7 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 
 > План целиком: `C:\Projects\Universal-AI\.koda\plans\ai-serve-compat.md`.
 > Расширение живёт в `C:\Projects\VSCodeExtension`. Один коммит на шаг, пуш не делаем.
+> Статус: шаги A1–A9 и B1–B2 выполнены, шаг F1 (README расширения) — в работе.
 
 Зачем: пакет `@u2ai/server` — это сервер, а не только MCP. Расширение VSCode должно
 работать и с ним, и со старым монолитным `ai serve`; и только у расширения есть доступ
@@ -380,13 +381,13 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/mcp-client-tools.test.js` — 7 тестов: список, вызов, ушедший клиент, таймаут, отказ
 
 ### step-A5 … A9, B1, B2 — Расширение
-- [ ] Адрес сервера из двух домашних каталогов
-- [ ] Захват инструментов для каждого прогона, регистрация своих инструментов
-- [ ] Настройки запуска и модель
-- [ ] Запасной путь tab-autocomplete через HTTP
-- [ ] MCP-клиент к `/mcp`
-- [ ] stdio MCP-сервер расширения
-- [ ] Режим прокси
+- [x] Адрес сервера из двух домашних каталогов (`AI_SERVE_HOME`/`~/.ai-serve`, `AI_AGENT_HOME`/`~/.ai-agent`)
+- [x] Захват инструментов для каждого прогона, регистрация своих инструментов (`tools.register`)
+- [x] Настройки запуска и модель (`vext.agent.server`, `vext.agent.command`, дефолт `minimax/minimax-m3.1-flash`)
+- [x] Запасной путь tab-autocomplete через HTTP (`/v1/complete`)
+- [x] MCP-клиент к `/mcp` (`vext.agent.tools`)
+- [x] stdio MCP-сервер расширения (`dist/agent-mcp.mjs`, команда `vext.agent.mcp`)
+- [x] Режим прокси: инструменты редактора видны в MCP пакета под именами `vscode__*`
 
 ---
 
