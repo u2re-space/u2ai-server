@@ -112,6 +112,19 @@ export {
 export { HTTP_ROUTES, checkToken, requestToken, readJsonBody, createHttpHandler } from './server/http.js';
 export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServe } from './server/serve.js';
 export { createHub, attachConnection } from './server/u2ai.js';
+export {
+    MCP_PROTOCOL_VERSION,
+    MCP_SUPPORTED_PROTOCOLS,
+    MCP_ERROR,
+    MCP_RESOURCES,
+    MCP_PROMPTS,
+    mcpToolList,
+    createMcpServer,
+    createMcpHttpHandler,
+    startStdioServer,
+    startHttpServer,
+    newMcpToken,
+} from './server/mcp.js';
 
 export {
     NOISY_DIRS,

@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 9 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace).
+> Актуальный статус: **шаг 10 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -212,11 +212,13 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/context.test.js` — 33 теста: карта проекта, разбор jsonc, html-entry, упоминания, `AGENTS.md`, подсказки
 
 ### step-10 — MCP-сервер (приоритет v0.3)
-- [ ] `src/server/mcp.js` — JSON-RPC 2.0 без SDK: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`
-- [ ] Режимы: stdio (по умолчанию) и HTTP (`--http [--port n]`) с тем же токеном, что и шина
-- [ ] `src/server/mcp.js` — экспорт всех инструментов пакета (FS, терминал, контекст) наружу
-- [ ] Таймауты вызова, отмена (`notifications/cancelled`), понятные тексты ошибок
-- [ ] `test/mcp.test.js` — `initialize` → `tools/list` → `tools/call` по stdio, проверка схем
+- [x] `src/server/mcp.js` — JSON-RPC 2.0 без SDK: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`
+- [x] Режимы: stdio (по умолчанию) и HTTP (`--http [--port n]`) с тем же токеном, что и шина
+- [x] `src/server/mcp.js` — экспорт всех инструментов пакета (FS, терминал, контекст) наружу
+- [x] Таймауты вызова, отмена (`notifications/cancelled`), понятные тексты ошибок
+- [x] `src/server/serve.js` — эндпоинт `/mcp` на порту шины с тем же токеном
+- [x] `src/cli.js` — команда `mcp`: stdio по умолчанию, HTTP с `--http`
+- [x] `test/mcp.test.js` — 28 тестов: `initialize` → `tools/list` → `tools/call`, ресурсы, промпты, таймаут, отмена, оба транспорта
 
 ### step-11 — MCP-клиент
 - [ ] `src/client/mcp.js` — `initialize`, `tools/list`, `tools/call`; протоколы `2025-06-18`, `2025-03-26`, `2024-11-05`

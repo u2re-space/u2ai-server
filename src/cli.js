@@ -14,8 +14,10 @@ import { randomBytes } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
 import { loadConfig, redactConfig } from './config.js';
-import { startServe } from './server/serve.js';
+import { startServe, readServeRecord, pidAlive } from './server/serve.js';
+import { serveFile } from './config/paths.js';
 import { createHub } from './server/u2ai.js';
+import { createMcpServer, startStdioServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
 const require = createRequire(import.meta.url);
@@ -135,6 +137,8 @@ async function commandServe(opts) {
             host: config.server?.host ?? '127.0.0.1',
             token,
             hub,
+            // The MCP endpoint of the server: the same port and the same token.
+            mcp: createMcpServer({ root: cwd, config }),
         });
     } catch (error) {
         process.off('SIGINT', stop);
@@ -145,6 +149,7 @@ async function commandServe(opts) {
 
     console.log(`Bus: ${handle.url}`);
     console.log(`HTTP: ${handle.httpURL}`);
+    console.log(`MCP: ${handle.httpURL.replace(/\/$/, '')}/mcp`);
     if (handle.file) console.log(`File: ${handle.file}`);
     console.log('Press Ctrl+C to stop.');
 
@@ -154,6 +159,85 @@ async function commandServe(opts) {
     });
 
     hub.shutdown();
+    await handle.close();
+    process.off('SIGINT', stop);
+    process.off('SIGTERM', stop);
+    return EXIT.ok;
+}
+
+/**
+ * The `mcp` command: run the MCP server alone.
+ *
+ * Over stdio the server speaks the protocol with the client of the editor; over HTTP it
+ * listens on a port and takes the token of the running bus, when there is one.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandMcp(opts) {
+    const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
+    let config;
+    try {
+        config = await loadConfig({ configPath: opts.configPath, cwd });
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+
+    let port;
+    try {
+        port = resolvePort(opts.port, config);
+    } catch (error) {
+        return usage(error.message);
+    }
+
+    const server = createMcpServer({ root: cwd, config });
+
+    const controller = new AbortController();
+    const stop = () => controller.abort();
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
+
+    if (!opts.http) {
+        const handle = startStdioServer({ server });
+        // The client closed the stream: the server stops with it.
+        process.stdin.once('end', stop);
+        await new Promise((resolve) => {
+            if (controller.signal.aborted) resolve();
+            else controller.signal.addEventListener('abort', resolve, { once: true });
+        });
+        handle.close();
+        process.stdin.off('end', stop);
+        process.off('SIGINT', stop);
+        process.off('SIGTERM', stop);
+        return EXIT.ok;
+    }
+
+    // The token of the bus is the token of the server: the client of the editor knows it.
+    const record = await readServeRecord(serveFile(config.home));
+    const token = record && pidAlive(record.pid) ? record.token : newMcpToken();
+    let handle;
+    try {
+        handle = await startHttpServer({
+            server,
+            port,
+            host: config.server?.host ?? '127.0.0.1',
+            token,
+        });
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+
+    console.log(`MCP: ${handle.url}`);
+    console.log(`Token: ${token}`);
+    console.log('Press Ctrl+C to stop.');
+
+    await new Promise((resolve) => {
+        if (controller.signal.aborted) resolve();
+        else controller.signal.addEventListener('abort', resolve, { once: true });
+    });
+
     await handle.close();
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);
@@ -189,6 +273,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (opts.command === 'serve') {
         return await commandServe(opts);
+    }
+    if (opts.command === 'mcp') {
+        return await commandMcp(opts);
     }
     if (COMMAND_NAMES.includes(opts.command)) {
         return pending(opts.command);

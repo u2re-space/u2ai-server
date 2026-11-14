@@ -24,6 +24,7 @@ import path from 'node:path';
 import { serveFile } from '../config/paths.js';
 import { listenWebSocket } from './ws.js';
 import { createHttpHandler } from './http.js';
+import { createMcpHttpHandler } from './mcp.js';
 import { attachConnection } from './u2ai.js';
 import { PROTOCOL_VERSION, MAX_FRAME_BYTES } from '../shared/protocol.js';
 
@@ -110,7 +111,7 @@ function notReadyConnection(connection) {
  * @param {{ home: string, config?: object|null, port?: number, host?: string, token?: string,
  *           onConnection?: Function|null, hub?: object|null, onRequest?: Function|null,
  *           onUpgrade?: Function|null, onComplete?: Function|null, onStructure?: Function|null,
- *           tools?: object[]|Function, writeFile?: boolean, file?: string|null }} [options]
+ *           tools?: object[]|Function, mcp?: object|null, writeFile?: boolean, file?: string|null }} [options]
  * @returns {Promise<{ url: string, httpURL: string, port: number, token: string, file: string|null,
  *           record: object, close: () => Promise<void> }>}
  * @exports
@@ -129,6 +130,7 @@ export async function startServe({
     onComplete = null,
     onStructure = null,
     tools = [],
+    mcp = null,
     writeFile: write = true,
     file = null,
 } = {}) {
@@ -152,6 +154,11 @@ export async function startServe({
         onStructure,
         maxBodyBytes: config?.limits?.maxBodyBytes ?? 8 * 1024 * 1024,
     });
+    // The MCP endpoint shares the port and the token of the bus.
+    const mcpHandler = mcp ? createMcpHttpHandler({ server: mcp, tokens }) : null;
+    const handler = mcpHandler
+        ? async (req, res) => (await mcpHandler(req, res)) || await http(req, res)
+        : http;
 
     let listener;
     try {
@@ -159,7 +166,7 @@ export async function startServe({
             port,
             host,
             onConnection: onConnection ?? (hub ? (connection) => attachConnection(hub, connection) : notReadyConnection),
-            onRequest: http,
+            onRequest: handler,
             onUpgrade,
             pingIntervalMs: config?.server?.pingIntervalMs ?? 30_000,
             idleMs: config?.server?.idleTimeoutMs ?? 90_000,
