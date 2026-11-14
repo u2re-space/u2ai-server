@@ -12,13 +12,14 @@
  * @exports PROTOCOL_VERSION, MAX_FRAME_BYTES, MAX_COMPLETION_CONTEXT_BYTES,
  *          MAX_COMPLETION_FRAME_BYTES, TOOL_REQUEST_TIMEOUT_MS, COMPLETION_WINDOWS, COMMANDS,
  *          APPROVE_MODES, DECISIONS, START_FIELDS, REJECTED_START_FIELDS, FRAME_TYPES,
- *          EVENT_TYPES, PROCESSABLE_TOOLS, END_STATUSES, ROLES, completionWindowLines
+ *          EVENT_TYPES, PROCESSABLE_TOOLS, END_STATUSES, ROLES, MAX_CLIENT_TOOLS,
+ *          CLIENT_TOOL_SEPARATOR, completionWindowLines
  * @ai.tags protocol, shared
  * @ai.hint pure
  */
 
 /** The version of the protocol. The client sends it in the `hello` frame. */
-export const PROTOCOL_VERSION = '0.3';
+export const PROTOCOL_VERSION = '0.4';
 
 /** Largest accepted frame. A bigger frame closes the socket with the code 1009. */
 export const MAX_FRAME_BYTES = 1_048_576;
@@ -95,8 +96,23 @@ export const REJECTED_START_FIELDS = Object.freeze(['background', 'detach', 'job
 /** The frames a client may send. */
 export const FRAME_TYPES = Object.freeze([
     'hello', 'start', 'input', 'approve', 'answer', 'complete', 'cancel', 'subscribe', 'unsubscribe', 'ping',
-    'processing.claim', 'tool.result',
+    'processing.claim', 'tool.result', 'tools.register',
 ]);
+
+/**
+ * The largest list of the tools a client may publish in one frame.
+ *
+ * The list is the catalog of the editor: a few dozen tools, not a thousand.
+ */
+export const MAX_CLIENT_TOOLS = 200;
+
+/**
+ * The separator between the name of a client and the name of its tool.
+ *
+ * The tools of the clients live in the same namespace as the tools of the package, so the
+ * names must not collide: every tool of a client is named `client__tool`.
+ */
+export const CLIENT_TOOL_SEPARATOR = '__';
 
 /**
  * The events of a run.

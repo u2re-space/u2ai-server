@@ -366,8 +366,12 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `README.md` — раздел «The contract of `serve.json`»
 
 ### step-A3 — Протокол 0.4
-- [ ] Кадр `tools.register`: клиент публикует свои инструменты
-- [ ] `hub.listClientTools()` и `hub.callClientTool()`
+- [x] `src/shared/protocol.js` — версия `0.4`, кадр `tools.register`, `MAX_CLIENT_TOOLS`, `CLIENT_TOOL_SEPARATOR`
+- [x] `src/shared/decoder.js` — проверка кадра `tools.register` и имени клиента в `hello`
+- [x] `src/shared/encoder.js` — `toolCallFrame`, `toolsRegisteredFrame`, версия в `ready`
+- [x] `src/server/u2ai.js` — приём `tools.register`, `hub.listClientTools()`, `hub.callClientTool()`
+- [x] `test/client-tools.test.js` — 10 тестов: публикация, замена списка, вызов, таймаут, проверка кадра
+- [x] `README.md` — раздел «The tools of the clients»
 
 ### step-A4 — Инструменты клиентов в MCP
 - [ ] MCP-сервер пакета показывает инструменты клиентов шины и вызывает их

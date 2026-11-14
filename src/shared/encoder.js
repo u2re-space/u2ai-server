@@ -9,7 +9,7 @@
  *          runEventFrame, textDeltaFrame, reasoningDeltaFrame, toolExecStartFrame,
  *          toolExecDoneFrame, warningFrame, errorEventFrame, imageSavedFrame, imageProgressFrame,
  *          responseDoneFrame, approvalRequestFrame, questionRequestFrame, completionFrame,
- *          buildCompletionFrame
+ *          toolCallFrame, toolsRegisteredFrame, buildCompletionFrame
  * @ai.tags protocol, encoder
  * @ai.hint pure
  */
@@ -19,6 +19,7 @@ import {
     MAX_COMPLETION_CONTEXT_BYTES,
     MAX_COMPLETION_FRAME_BYTES,
     COMPLETION_WINDOWS,
+    PROTOCOL_VERSION,
 } from './protocol.js';
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -129,7 +130,7 @@ export function errorFrame(code, message) {
  * @ai.hint pure
  */
 export function readyFrame(runs = []) {
-    return { type: 'ready', protocol: '0.3', runs: Array.isArray(runs) ? runs : [] };
+    return { type: 'ready', protocol: PROTOCOL_VERSION, runs: Array.isArray(runs) ? runs : [] };
 }
 
 /**
@@ -338,6 +339,38 @@ export function questionRequestFrame(runId, requestId, question) {
  */
 export function completionFrame(id, text) {
     return { type: 'completion', id, text: textOf(text) };
+}
+
+/**
+ * The frame that asks a client to run one of its own tools.
+ *
+ * The client answers with `tool.result`: the requestId of the frame is the key of it.
+ *
+ * @param {string} requestId
+ * @param {string} name the name of the tool of the client, without the prefix
+ * @param {object} args the arguments of the tool
+ * @returns {object}
+ * @exports
+ * @ai.hint pure
+ */
+export function toolCallFrame(requestId, name, args = {}) {
+    return {
+        type: 'tool.call',
+        requestId,
+        name: textOf(name),
+        arguments: args && typeof args === 'object' ? args : {},
+    };
+}
+
+/**
+ * The answer of the server: the tools of the client are published.
+ * @param {string[]} names the names of the published tools
+ * @returns {object}
+ * @exports
+ * @ai.hint pure
+ */
+export function toolsRegisteredFrame(names = []) {
+    return { type: 'tools.registered', tools: Array.isArray(names) ? names.map(String) : [] };
 }
 
 /**

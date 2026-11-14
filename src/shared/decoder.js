@@ -10,7 +10,7 @@
  * @depends shared/protocol
  * @usedBy server/ws, server/u2ai, server/http
  * @exports decodeFrame, validateFrame, validateStart, validateComplete, validateClaim,
- *          validateToolResult
+ *          validateToolResult, validateToolsRegister
  * @ai.tags protocol, decoder
  * @ai.hint pure
  */
@@ -25,6 +25,7 @@ import {
     REJECTED_START_FIELDS,
     FRAME_TYPES,
     PROCESSABLE_TOOLS,
+    MAX_CLIENT_TOOLS,
 } from './protocol.js';
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -84,8 +85,13 @@ export function validateFrame(frame) {
         case 'hello': {
             if (!textOf(frame.token).trim()) return fail('bad_request', 'The hello frame needs a token.');
             if (!ROLES.includes(frame.role)) return fail('bad_request', 'The role must be client or publisher.');
+            if (frame.name !== undefined && typeof frame.name !== 'string') {
+                return fail('bad_request', 'The name of the client must be a string.');
+            }
             return { ok: true, frame };
         }
+        case 'tools.register':
+            return validateToolsRegister(frame);
         case 'start':
             return validateStart(frame);
         case 'input': {
@@ -177,6 +183,40 @@ export function validateStart(frame) {
             }
             if (seen.has(name)) return fail('invalid_start', `The name of the tool repeats: ${name}.`);
             seen.add(name);
+        }
+    }
+    return { ok: true, frame };
+}
+
+/**
+ * Check the fields of a `tools.register` frame.
+ *
+ * A client publishes the tools of its own: the file system of the editor, the terminal of
+ * the editor. Every tool needs a name, and the name may not repeat inside the list.
+ *
+ * @param {object} frame
+ * @returns {{ ok: true, frame: object } | { ok: false, code: string, message: string }}
+ * @exports
+ * @ai.hint pure
+ */
+export function validateToolsRegister(frame) {
+    if (!Array.isArray(frame.tools)) return fail('bad_request', 'The tools.register frame needs a list of tools.');
+    if (frame.tools.length > MAX_CLIENT_TOOLS) {
+        return fail('bad_request', `The list of the tools is longer than ${MAX_CLIENT_TOOLS}.`);
+    }
+    const seen = new Set();
+    for (const tool of frame.tools) {
+        if (!isRecord(tool)) return fail('bad_request', 'A tool must be an object.');
+        const name = textOf(tool.name).trim();
+        if (!name) return fail('bad_request', 'A tool needs a name.');
+        if (name.length > 80) return fail('bad_request', `The name of the tool is too long: ${name}.`);
+        if (seen.has(name)) return fail('bad_request', `The name of the tool repeats: ${name}.`);
+        seen.add(name);
+        if (tool.description !== undefined && typeof tool.description !== 'string') {
+            return fail('bad_request', `The description of the tool ${name} must be a string.`);
+        }
+        if (tool.parameters !== undefined && !isRecord(tool.parameters)) {
+            return fail('bad_request', `The parameters of the tool ${name} must be an object.`);
         }
     }
     return { ok: true, frame };

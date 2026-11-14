@@ -183,7 +183,7 @@ test('the bus of the service says hello and answers ready', async () => {
   try {
     const bus = await connectBus({ url: service.url, token: service.token });
     assert.equal(bus.ready.type, 'ready');
-    assert.equal(bus.ready.protocol, '0.3');
+    assert.equal(bus.ready.protocol, '0.4');
     assert.ok(Array.isArray(bus.ready.runs));
     bus.close();
   } finally {

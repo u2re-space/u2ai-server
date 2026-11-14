@@ -147,12 +147,12 @@ The strings of the configuration understand the placeholders `{{env:NAME}}` and
 
 ## The protocol `ai-serve`
 
-The bus is a stream of JSON texts over a WebSocket. The version of the protocol is `0.3`;
+The bus is a stream of JSON texts over a WebSocket. The version of the protocol is `0.4`;
 the client sends it in the `hello` frame.
 
 | Moment | Frame |
 |---|---|
-| The greeting | client → `{ "type": "hello", "role": "client", "token": "<token>" }`; the server answers `{ "type": "ready", "runs": [...] }`. |
+| The greeting | client → `{ "type": "hello", "role": "client", "token": "<token>", "name": "vscode" }`; the server answers `{ "type": "ready", "runs": [...] }`. |
 | The start of a run | `{ "type": "start", "command": "ask\|run\|chat\|image", "prompt": "...", "cwd": "...", "approve": "ask", ... }` |
 | The announcement of a run | `{ "type": "run.started", "run": { "id": "...", "command": "ask", "cwd": "...", "status": "running" } }` |
 | The continuation of a chat | `{ "type": "input", "runId": "...", "text": "..." }` |
@@ -163,6 +163,17 @@ the client sends it in the `hello` frame.
 | The end of a run | `{ "type": "run.ended", "runId": "...", "status": "completed\|failed\|cancelled", "exitCode": 0 }` |
 | The tools of the processing | `{ "type": "processing.claim", "runId": "...", "tools": [...] }` → `processing.claimed`, `processing.held`, `processing.released` |
 | A tool of a client | `{ "type": "tool.request", "requestId": "...", "name": "...", "args": {...} }` → `{ "type": "tool.result", "requestId": "...", "output": "..." }` |
+| The tools of a client | `{ "type": "tools.register", "tools": [{ "name": "read_file", "description": "...", "parameters": {...} }] }` → `tools.registered` |
+| A tool of the catalog of a client | server → `{ "type": "tool.call", "requestId": "...", "name": "read_file", "arguments": {...} }` → `{ "type": "tool.result", "requestId": "...", "output": "..." }` |
+
+### The tools of the clients
+
+A client may publish the tools of its own — the file system of the editor, the terminal of
+the editor. The names of the tools carry the name of the client, so two clients may have a
+tool with the same name: the tool `read_file` of the client `vscode` is `vscode__read_file`.
+
+The server keeps the catalog of every client, and the MCP server publishes it. A client
+that is gone takes its tools with it.
 
 The events of a run are `text.delta`, `text.done`, `reasoning.delta`, `tool.exec.start`,
 `tool.exec.done`, `warning`, `error`, `image.saved`, `image.progress`, `response.done`,
@@ -181,8 +192,12 @@ into `serve.json` with the mode `0600`:
   "pid": 12345,
   "url": "ws://127.0.0.1:8765",
   "httpURL": "http://127.0.0.1:8765",
+  "complete": "http://127.0.0.1:8765/v1/complete",
+  "structure": "http://127.0.0.1:8765/v1/structure",
+  "completeWs": "ws://127.0.0.1:8765/v1/complete",
+  "mcp": "http://127.0.0.1:8765/mcp",
   "token": "<64 hex characters>",
-  "protocol": "0.3",
+  "protocol": "0.4",
   "startedAt": "2026-11-14T12:00:00.000Z"
 }
 ```
@@ -388,7 +403,7 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 416 tests
+npm test          # 426 tests
 npm pack --dry-run
 ```
 
