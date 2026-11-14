@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 18 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита, тесты).
+> Актуальный статус: **шаг 19 из 19 выполнен** — пакет готов к релизу (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита, тесты, README и релиз-чеклист).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -89,12 +89,12 @@ WebSocket-транспорт, HTTP-мост `/v1/complete`, MCP-клиент и 
 
 ```
 src/agent/     access.js autocomplete.js callable.js context.js remote.js
-src/cli/       colors.js compatibility.js parser.js renderer.js
+src/cli/       colors.js compatibility.js doctor.js parser.js
 src/client/    fetch.js http.js mcp.js node.js proxy.js
 src/config/    constants.js defaults.js parser.js
 src/model/     profiles.js
 src/openai/    batch.js chat.js client.js completions.js decision.js fallback.js fetch.js http.js responses.js
-src/roles/     analyzer.js director.js executor.js suggestor.js tooler.js
+src/roles/     analyzer.js director.js executor.js suggester.js tooler.js
 src/server/    http.js mcp.js u2ai.js ws.js
 src/shared/    decoder.js encoder.js protocol.js
 src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js transfer.js
@@ -110,7 +110,7 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 | `ai-serve agent "<task>" [--cwd d]` | разовая задача как ИИ-агент (роль + инструменты) |
 | `ai-serve complete --file f --line n` | одноразовое дополнение из командной строки |
 | `ai-serve services` | список подключённых внешних сервисов (ai-serve и MCP) и их состояние |
-| `ai-serve config [show\|path]` | показать/проверить конфиг |
+| `ai-serve config` | показать разрешённый конфиг (секреты укорочены) |
 | `ai-serve doctor` | проверка окружения: Node, конфиг, ключи, порт, доступность сервисов |
 
 **Контракт `ai-serve` (совпадает с текущим поведением `ai serve`):**
@@ -296,9 +296,13 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `npm test` — 389 тестов: 388 проходят, 1 пропущен, 0 падений
 
 ### step-19 — README и релиз-чеклист
-- [ ] `README.md` — установка, команды, конфиг, протокол `ai-serve`, MCP, примеры
-- [ ] Чеклист релиза: `npm run check`, `npm test`, `npm pack --dry-run`, версия, репозиторий
-- [ ] `planned.md` — отметки шагов
+- [x] `README.md` — установка, команды, конфиг, протокол `ai-serve`, MCP, примеры
+- [x] `package.json` — версия `0.3.0`, репозиторий `u2re-space/u2ai-server`, зависимостей нет
+- [x] Убраны пустые файлы-заготовки: `src/cli/renderer.js`, `src/roles/suggestor.js`
+- [x] Роль `suggester` в enum'ах и дефолтах конфига (было `suggestor`)
+- [x] `planned.md` — отметки шагов
+- [x] Чеклист релиза: `npm run check` (78 файлов), `npm test` (389 тестов: 388 проходят, 1 пропущен),
+      `npm pack --dry-run` (69 файлов, 143.8 КиБ), версия `0.3.0`, репозиторий настроен
 
 ---
 

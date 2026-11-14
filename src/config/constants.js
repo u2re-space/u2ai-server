@@ -32,14 +32,14 @@ export const ENUMS = Object.freeze({
   /** Transports of the MCP server we run ourselves. */
   mcpTransports: Object.freeze(['stdio', 'http']),
   /** Roles of the server agent. */
-  roles: Object.freeze(['analyzer', 'director', 'executor', 'tooler', 'suggestor']),
+  roles: Object.freeze(['analyzer', 'director', 'executor', 'tooler', 'suggester']),
   /** Shells the terminal tool may use. */
   shells: Object.freeze(['powershell', 'pwsh', 'cmd', 'bash', 'sh', 'zsh']),
 });
 
 /** Role names that always exist; user roles are validated against the schema only. */
 export const BUILTIN_ROLE_NAMES = Object.freeze([
-  'default', 'analyzer', 'director', 'executor', 'tooler', 'suggestor',
+  'default', 'analyzer', 'director', 'executor', 'tooler', 'suggester',
 ]);
 
 /** Alias spellings accepted in backend `supports` maps. */

@@ -176,7 +176,7 @@ export const defaults = {
     director: {},
     executor: {},
     tooler: {},
-    suggestor: {},
+    suggester: {},
   },
 
   /** Extra named roles merged into the role registry at load. */
