@@ -1,8 +1,8 @@
 /**
- * @file src/client/node.js
- * @module client/node
- * @purpose The stdio transport of the MCP client: start the server as a child process and
- *          speak the protocol over its standard input and output.
+ * @file src/client/stdio.js
+ * @module client/stdio
+ * @purpose The stdio transport of the MCP client: start the server as a child process
+ *          and speak the protocol over its standard input and output.
  *
  *   The child gets the environment of the package: every variable that looks like a
  *   secret is gone, so a third-party server never sees the keys of the user.
@@ -11,7 +11,7 @@
  *   no answer in time is refused, and the child that dies takes the waiting requests with
  *   it.
  *
- * @depends node:child_process
+ * @depends node:child_process, tools/terminal
  * @usedBy client/proxy
  * @exports startNodeServer
  * @ai.tags mcp, client, stdio

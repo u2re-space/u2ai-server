@@ -17,10 +17,10 @@
  *   3. a cancelled call is aborted and stays unanswered, as the protocol asks.
  *
  * @depends node:http, tools/tools, tools/context, shared/format
- * @usedBy cli, server/serve
+ * @usedBy cli, server/serve, server/stdio
  * @exports MCP_PROTOCOL_VERSION, MCP_SUPPORTED_PROTOCOLS, MCP_ERROR, MCP_RESOURCES,
  *          MCP_PROMPTS, mcpToolList, createMcpServer, createMcpHttpHandler,
- *          startStdioServer, startHttpServer
+ *          startHttpServer, newMcpToken, errorResponse
  * @ai.tags mcp, jsonrpc, server
  * @ai.hint io
  */
@@ -75,15 +75,21 @@ export const MCP_PROMPTS = Object.freeze([
 ]);
 
 /**
- * The error answer of JSON-RPC.
- * @param {string|number|null} id
+ * The answer of an error of JSON-RPC.
+ *
+ * The helper lives here, because the transports build their answers with it: the
+ * stdio transport of the server (`server/stdio.js`) and the HTTP route of the
+ * protocol (`/mcp`).
+ *
+ * @param {string|number|null} id the id of the message
  * @param {number} code
  * @param {string} message
  * @param {unknown} [data]
  * @returns {object}
+ * @exports
  * @ai.hint pure
  */
-function errorResponse(id, code, message, data) {
+export function errorResponse(id, code, message, data) {
     const error = { code, message };
     if (data !== undefined) error.data = data;
     return { jsonrpc: '2.0', id: id ?? null, error };
@@ -346,82 +352,6 @@ export function createMcpServer({
     };
 
     return { handle, listTools, close: () => pending.clear() };
-}
-
-/**
- * Run the server over stdio: one JSON message per line.
- *
- * @param {{ server: object, input?: NodeJS.ReadableStream, output?: NodeJS.WritableStream }} options
- * @returns {{ close: () => void }}
- * @exports
- * @ai.hint io
- */
-export function startStdioServer({ server, input = process.stdin, output = process.stdout } = {}) {
-    let buffer = '';
-    let closed = false;
-
-    /**
-     * Write one answer.
-     * @param {unknown} payload
-     * @returns {void}
-     * @ai.hint io
-     */
-    const write = (payload) => {
-        if (closed) return;
-        output.write(`${JSON.stringify(payload)}\n`);
-    };
-
-    /**
-     * The answer of one line.
-     * @param {string} line
-     * @returns {Promise<void>}
-     * @ai.hint io
-     */
-    const processLine = async (line) => {
-        let message;
-        try {
-            message = JSON.parse(line);
-        } catch (error) {
-            write(errorResponse(null, MCP_ERROR.parse, `The message is not valid JSON: ${error.message}`));
-            return;
-        }
-        try {
-            const answer = await server.handle(message);
-            if (answer) write(answer);
-        } catch (error) {
-            write(errorResponse(message?.id ?? null, MCP_ERROR.internal, error?.message ?? String(error)));
-        }
-    };
-
-    /**
-     * The answer of the data of the stream.
-     * @param {Buffer|string} chunk
-     * @returns {Promise<void>}
-     * @ai.hint io
-     */
-    const onData = async (chunk) => {
-        buffer += String(chunk);
-        for (;;) {
-            const index = buffer.indexOf('\n');
-            if (index < 0) break;
-            const line = buffer.slice(0, index).trim();
-            buffer = buffer.slice(index + 1);
-            if (line) await processLine(line);
-        }
-    };
-
-    input.setEncoding?.('utf8');
-    input.on('data', onData);
-    input.resume?.();
-
-    return {
-        close() {
-            if (closed) return;
-            closed = true;
-            input.off?.('data', onData);
-            server.close?.();
-        },
-    };
 }
 
 /**

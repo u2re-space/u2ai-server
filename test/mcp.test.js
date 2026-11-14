@@ -20,9 +20,9 @@ import {
   MCP_PROMPTS,
   mcpToolList,
   createMcpServer,
-  startStdioServer,
   startHttpServer,
 } from '../src/server/mcp.js';
+import { startStdioServer } from '../src/server/stdio.js';
 import { startServe } from '../src/server/serve.js';
 import { TOOL_NAMES } from '../src/tools/tools.js';
 

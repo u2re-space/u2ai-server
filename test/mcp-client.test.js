@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { createMcpClient, McpError, toolText, CLIENT_PROTOCOL_VERSIONS } from '../src/client/mcp.js';
-import { startNodeServer } from '../src/client/node.js';
+import { startNodeServer } from '../src/client/stdio.js';
 import { createFetchTransport } from '../src/client/fetch.js';
 import { createHttpTransport, mcpUrl } from '../src/client/http.js';
 import {

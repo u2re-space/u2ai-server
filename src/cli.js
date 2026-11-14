@@ -20,7 +20,8 @@ import { readMcpFile, registerService, removeService, registerMcpServer, removeM
 import { defaultHome, homeConfigFile, homeMcpFile, serveFile } from './config/paths.js';
 import { startServe, readServeRecord, pidAlive } from './server/serve.js';
 import { createHub } from './server/u2ai.js';
-import { createMcpServer, startStdioServer, startHttpServer, newMcpToken } from './server/mcp.js';
+import { createMcpServer, startHttpServer, newMcpToken } from './server/mcp.js';
+import { startStdioServer } from './server/stdio.js';
 import { createClient } from './openai/client.js';
 import { completeAtCursor } from './agent/autocomplete.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed } from './tools/tools.js';

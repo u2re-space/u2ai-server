@@ -19,7 +19,7 @@
  *   of the server are read from that file. The process is watched: when it dies, the
  *   service is gone.
  *
- * @depends client/mcp, client/node, client/http, node:child_process
+ * @depends client/mcp, client/stdio, client/http, node:child_process
  * @usedBy agent/roles, server/u2ai, cli
  * @exports normalizeServer, proxyToolName, splitProxyToolName, proxyToolDefinition,
  *          connectServer, connectServers, createToolProxy, normalizeService,
@@ -31,7 +31,7 @@
 import { spawn } from 'node:child_process';
 import { readFile, rm } from 'node:fs/promises';
 import { createMcpClient } from './mcp.js';
-import { startNodeServer } from './node.js';
+import { startNodeServer } from './stdio.js';
 import { createHttpTransport } from './http.js';
 import { readServeRecord, pidAlive } from '../server/serve.js';
 

@@ -12,7 +12,7 @@
  *   client works over stdio and over HTTP.
  *
  * @depends nothing
- * @usedBy client/node, client/http, client/proxy
+ * @usedBy client/stdio, client/http, client/proxy
  * @exports CLIENT_PROTOCOL_VERSIONS, McpError, createMcpClient, toolText
  * @ai.tags mcp, client, jsonrpc
  * @ai.hint io

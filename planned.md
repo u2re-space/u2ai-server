@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 19 из 19 выполнен** — пакет готов к релизу (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита, тесты, README и релиз-чеклист).
+> Актуальный статус: **все 19 шагов плана выполнены**, пакет готов к релизу (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита, тесты, README и релиз-чеклист). После релиза добавлен шаг 20 — транспорты stdio в отдельных модулях.
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -90,12 +90,12 @@ WebSocket-транспорт, HTTP-мост `/v1/complete`, MCP-клиент и 
 ```
 src/agent/     access.js autocomplete.js callable.js context.js remote.js
 src/cli/       colors.js compatibility.js doctor.js parser.js
-src/client/    fetch.js http.js mcp.js node.js proxy.js
+src/client/    fetch.js http.js mcp.js proxy.js stdio.js
 src/config/    constants.js defaults.js parser.js
 src/model/     profiles.js
 src/openai/    batch.js chat.js client.js completions.js decision.js fallback.js fetch.js http.js responses.js
 src/roles/     analyzer.js director.js executor.js suggester.js tooler.js
-src/server/    http.js mcp.js u2ai.js ws.js
+src/server/    http.js mcp.js stdio.js u2ai.js ws.js
 src/shared/    decoder.js encoder.js protocol.js
 src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js transfer.js
 ```
@@ -303,6 +303,15 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `planned.md` — отметки шагов
 - [x] Чеклист релиза: `npm run check` (78 файлов), `npm test` (389 тестов: 388 проходят, 1 пропущен),
       `npm pack --dry-run` (69 файлов, 143.8 КиБ), версия `0.3.0`, репозиторий настроен
+
+### step-20 — Транспорты stdio в отдельных модулях
+- [x] `src/server/stdio.js` — stdio-транспорт MCP-сервера: строка JSON на вход, строка JSON на выход
+- [x] `src/client/stdio.js` — stdio-транспорт MCP-клиента: запуск внешнего сервера как дочернего процесса
+- [x] `src/client/node.js` — удалён, код переехал в `src/client/stdio.js`
+- [x] `src/server/mcp.js` — `startStdioServer` ушла в `src/server/stdio.js`, `errorResponse` стала экспортом
+- [x] `src/index.js` — публичные экспорты не изменились: `startStdioServer`, `startNodeServer`
+- [x] `test/stdio.test.js` — 9 тестов: обе стороны транспорта, битая строка, уведомление, смерть ребёнка, CLI `mcp`
+- [x] `npm test` — 398 тестов: 397 проходят, 1 пропущен, 0 падений
 
 ---
 

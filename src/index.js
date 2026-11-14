@@ -130,10 +130,11 @@ export {
     mcpToolList,
     createMcpServer,
     createMcpHttpHandler,
-    startStdioServer,
     startHttpServer,
     newMcpToken,
+    errorResponse,
 } from './server/mcp.js';
+export { startStdioServer } from './server/stdio.js';
 
 export {
     NOISY_DIRS,
@@ -208,7 +209,7 @@ export {
     createMcpClient,
     toolText,
 } from './client/mcp.js';
-export { startNodeServer } from './client/node.js';
+export { startNodeServer } from './client/stdio.js';
 export { createFetchTransport } from './client/fetch.js';
 export { createHttpTransport, mcpUrl } from './client/http.js';
 export {
