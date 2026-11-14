@@ -145,7 +145,7 @@ export {
     resolveInside,
 } from './agent/access.js';
 export { createAccess, ACCESS_LIMITS, EXEC_LIMITS } from './access/index.js';
-export { createPathAccess } from './access/paths.js';
+export { createPathAccess, DEFAULT_MESSAGES } from './access/paths.js';
 export { createNativeBackend, createNativeFileSystem, createNativeExecutor } from './access/native.js';
 export { createMemoryBackend, createMemoryFileSystem, createMemoryExecutor } from './access/memory.js';
 export { formatBytes, formatDuration, truncateText } from './shared/format.js';

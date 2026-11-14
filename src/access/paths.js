@@ -17,7 +17,7 @@
  *
  * @depends node:path, node:fs/promises
  * @usedBy access/fs, access/exec, access/index, agent/access
- * @exports PROTECTED_FILES, FORBIDDEN_DIRS, READ_ONLY_DIRS, NOISY_DIRS,
+ * @exports PROTECTED_FILES, FORBIDDEN_DIRS, READ_ONLY_DIRS, NOISY_DIRS, DEFAULT_MESSAGES,
  *          isProtectedFileName, isForbiddenDirName, isReadOnlyDirName, toPosix, isInside,
  *          resolveInside, createPathAccess
  * @ai.tags paths, sandbox, access
@@ -38,6 +38,23 @@ export const READ_ONLY_DIRS = /^(?:\.git|node_modules)$/i;
 
 /** The directories that are skipped by the listing and the search. */
 export const NOISY_DIRS = /^(?:\.git|node_modules|\.hg|\.svn|dist|build|coverage|\.next|\.nuxt|\.cache|\.venv|venv|__pycache__|target|\.ai-agent|\.ai-serve|\.backup)$/i;
+
+/**
+ * The words of the refusals.
+ *
+ * A package may speak in its own language: the messages are a parameter, the rules are
+ * not. Every message is a function, and every one of them may be replaced.
+ * @type {Readonly<{ outside: Function, secret: Function, denied: Function, readOnly: Function, symlink: Function }>}
+ * @exports
+ * @ai.hint pure
+ */
+export const DEFAULT_MESSAGES = Object.freeze({
+    outside: (relative) => `The path is outside the working directory: ${relative}`,
+    secret: (rel) => `The file with the secret is not accessible: ${rel}`,
+    denied: (rel) => `The access is denied: ${rel}`,
+    readOnly: (segment, rel) => `The write into ${segment} is denied: ${rel}`,
+    symlink: (rel) => `The path through a symbolic link leaves the working directory: ${rel}`,
+});
 
 /**
  * Whether the name is a secret or a key file.
@@ -117,20 +134,22 @@ export async function resolveInside(root, relative, {
     allowRoot = true,
     lstat = nodeLstat,
     realpath = nodeRealpath,
+    messages = {},
 } = {}) {
     if (typeof relative !== 'string') throw new Error('The path must be a string.');
     if (relative.includes('\0')) throw new Error('The path contains a NUL.');
+    const words = { ...DEFAULT_MESSAGES, ...(messages ?? {}) };
     const base = path.resolve(String(root));
     const cleaned = relative.trim() === '' || relative.trim() === '.' ? '.' : relative.trim();
     const abs = path.resolve(base, cleaned);
-    if (!isInside(base, abs)) throw new Error(`The path is outside the working directory: ${relative}`);
+    if (!isInside(base, abs)) throw new Error(words.outside(relative));
     const rel = toPosix(path.relative(base, abs));
     if (rel === '' && !allowRoot) throw new Error('A path to a file is needed, not to the root.');
     const segments = rel ? rel.split('/') : [];
     for (const [index, segment] of segments.entries()) {
-        if (FORBIDDEN_DIRS.test(segment)) throw new Error(`The access is denied: ${rel}`);
-        if (index === segments.length - 1 && PROTECTED_FILES.test(segment)) throw new Error(`The file with the secret is not accessible: ${rel}`);
-        if (forWrite && READ_ONLY_DIRS.test(segment)) throw new Error(`The write into ${segment} is denied: ${rel}`);
+        if (FORBIDDEN_DIRS.test(segment)) throw new Error(words.denied(rel));
+        if (index === segments.length - 1 && PROTECTED_FILES.test(segment)) throw new Error(words.secret(rel));
+        if (forWrite && READ_ONLY_DIRS.test(segment)) throw new Error(words.readOnly(segment, rel));
     }
     if (lstat && realpath) {
         let probe = abs;
@@ -141,7 +160,7 @@ export async function resolveInside(root, relative, {
             if (info) {
                 const real = await realpath(probe).catch(() => probe);
                 const realRoot = await realpath(base).catch(() => base);
-                if (!isInside(realRoot, real)) throw new Error(`The path through a symbolic link leaves the working directory: ${rel}`);
+                if (!isInside(realRoot, real)) throw new Error(words.symlink(rel));
                 break;
             }
             const parent = path.dirname(probe);

@@ -48,12 +48,12 @@ const encoder = new TextEncoder();
 /**
  * The file system of one root.
  *
- * @param {{ root: string, backend: object, limits?: object }} options
+ * @param {{ root: string, backend: object, limits?: object, messages?: object }} options
  * @returns {object} the facade of the files
  * @exports
  * @ai.hint io
  */
-export function createFileSystem({ root, backend, limits = {} } = {}) {
+export function createFileSystem({ root, backend, limits = {}, messages = {} } = {}) {
     if (!backend || typeof backend.readFile !== 'function') {
         throw new Error('The access needs a backend of the file system.');
     }
@@ -68,6 +68,7 @@ export function createFileSystem({ root, backend, limits = {} } = {}) {
      */
     const resolve = (relative, options = {}) => resolveInside(base, relative, {
         ...options,
+        messages,
         lstat: typeof backend.lstat === 'function' ? backend.lstat : null,
         realpath: typeof backend.realpath === 'function' ? backend.realpath : null,
     });

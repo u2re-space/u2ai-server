@@ -35,12 +35,12 @@ export const EXEC_LIMITS = Object.freeze({
  * The runner of the commands of one root.
  *
  * @param {{ root: string, backend: object, env?: object, timeoutMs?: number, outputBytes?: number,
- *           probe?: { lstat?: Function, realpath?: Function }|null }} options
+ *           probe?: { lstat?: Function, realpath?: Function }|null, messages?: object }} options
  * @returns {object} the facade of the commands
  * @exports
  * @ai.hint io
  */
-export function createCommandRunner({ root, backend, env = process.env, timeoutMs = EXEC_LIMITS.timeoutMs, outputBytes = EXEC_LIMITS.outputBytes, probe = null } = {}) {
+export function createCommandRunner({ root, backend, env = process.env, timeoutMs = EXEC_LIMITS.timeoutMs, outputBytes = EXEC_LIMITS.outputBytes, probe = null, messages = {} } = {}) {
     if (!backend || typeof backend.run !== 'function') {
         throw new Error('The access needs a backend of the commands.');
     }
@@ -71,6 +71,7 @@ export function createCommandRunner({ root, backend, env = process.env, timeoutM
         const list = Array.isArray(args) ? args.map(String) : [];
         const { abs } = await resolveInside(base, cwd ?? '.', {
             allowRoot: true,
+            messages,
             ...(typeof probe?.lstat === 'function' ? { lstat: probe.lstat } : {}),
             ...(typeof probe?.realpath === 'function' ? { realpath: probe.realpath } : {}),
         });

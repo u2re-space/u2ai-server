@@ -33,7 +33,7 @@ export { resolveInside, isInside, toPosix, NOISY_DIRS } from './paths.js';
  * Create the access of one root.
  *
  * @param {{ root?: string, fs?: object|null, exec?: object|null, env?: object,
- *           limits?: object, timeoutMs?: number }} [options]
+ *           limits?: object, timeoutMs?: number, messages?: object }} [options]
  * @returns {{ root: string, fs: object, exec: object }}
  * @exports
  * @ai.hint io
@@ -45,18 +45,20 @@ export function createAccess({
     env = process.env,
     limits = {},
     timeoutMs = EXEC_LIMITS.timeoutMs,
+    messages = {},
 } = {}) {
     const base = path.resolve(String(root ?? process.cwd()));
     const fileBackend = fs ?? createNativeFileSystem();
     const execBackend = exec ?? createNativeExecutor();
     return {
         root: base,
-        fs: createFileSystem({ root: base, backend: fileBackend, limits }),
+        fs: createFileSystem({ root: base, backend: fileBackend, limits, messages }),
         exec: createCommandRunner({
             root: base,
             backend: execBackend,
             env,
             timeoutMs,
+            messages,
             probe: {
                 lstat: typeof fileBackend.lstat === 'function' ? fileBackend.lstat : null,
                 realpath: typeof fileBackend.realpath === 'function' ? fileBackend.realpath : null,
