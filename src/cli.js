@@ -170,16 +170,32 @@ async function commandServe(opts) {
             hub,
             onComplete,
             // The list of the tools of the configuration: the model sees the same list.
-            tools: TOOL_NAMES
-                .filter((name) => toolAllowed(name, config))
-                .map((name) => ({
-                    name,
-                    category: TOOL_SPECS[name].category,
-                    risk: TOOL_SPECS[name].risk,
-                    description: TOOL_SPECS[name].description,
+            // The tools of the clients of the bus are in the list too.
+            tools: () => [
+                ...TOOL_NAMES
+                    .filter((name) => toolAllowed(name, config))
+                    .map((name) => ({
+                        name,
+                        category: TOOL_SPECS[name].category,
+                        risk: TOOL_SPECS[name].risk,
+                        description: TOOL_SPECS[name].description,
+                    })),
+                ...hub.listClientTools().map((tool) => ({
+                    name: tool.name,
+                    category: 'client',
+                    risk: 'medium',
+                    description: tool.description,
+                    client: tool.client,
                 })),
-            // The MCP endpoint of the server: the same port and the same token.
-            mcp: createMcpServer({ root: cwd, config }),
+            ],
+            // The MCP endpoint of the server: the same port and the same token. It
+            // publishes the tools of the clients of the bus and calls them.
+            mcp: createMcpServer({
+                root: cwd,
+                config,
+                listClientTools: () => hub.listClientTools(),
+                callClientTool: (toolName, args) => hub.callClientTool(toolName, args),
+            }),
         });
     } catch (error) {
         process.off('SIGINT', stop);

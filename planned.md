@@ -374,7 +374,10 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `README.md` — раздел «The tools of the clients»
 
 ### step-A4 — Инструменты клиентов в MCP
-- [ ] MCP-сервер пакета показывает инструменты клиентов шины и вызывает их
+- [x] `src/server/mcp.js` — `mcpClientToolList()`, опции `listClientTools` и `callClientTool`
+- [x] `tools/list` показывает инструменты клиентов шины, `tools/call` вызывает их
+- [x] `src/cli.js` — MCP-сервер сервера связан с хабом; `/v1/tools` тоже показывает инструменты клиентов
+- [x] `test/mcp-client-tools.test.js` — 7 тестов: список, вызов, ушедший клиент, таймаут, отказ
 
 ### step-A5 … A9, B1, B2 — Расширение
 - [ ] Адрес сервера из двух домашних каталогов

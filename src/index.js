@@ -129,6 +129,7 @@ export {
     MCP_RESOURCES,
     MCP_PROMPTS,
     mcpToolList,
+    mcpClientToolList,
     createMcpServer,
     createMcpHttpHandler,
     startHttpServer,

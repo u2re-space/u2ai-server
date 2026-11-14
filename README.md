@@ -243,6 +243,24 @@ The methods: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
 The configuration decides which of them the model sees: `tools.allowWrite: false` hides
 every tool of the category `write`, `tools.allowTerminal: false` hides the category `exec`.
 
+### The tools of the clients
+
+The bus may have clients: an editor that published its tools with `tools.register`. The
+MCP server shows those tools in the same list and calls them on the owner of the tool.
+
+The names carry the name of the client, so two clients may have a tool with the same
+name: the tool `read_file` of the client `vscode` is `vscode__read_file`. The tool of
+the package keeps its own name, and the tool of a client is called with the name the
+client published, not with the name of the list.
+
+```json
+{ "name": "vscode__read_file", "description": "Read a file of the workspace.",
+  "inputSchema": { "type": "object", "properties": { "path": { "type": "string" } } } }
+```
+
+The same list is in the route `/v1/tools` of the HTTP part: the tools of the clients are
+there with the category `client`.
+
 ---
 
 ## The roles of the agent
@@ -403,7 +421,7 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 426 tests
+npm test          # 433 tests
 npm pack --dry-run
 ```
 

@@ -10,6 +10,11 @@
  *   workspace scan — and answers `initialize`, `tools/list`, `tools/call`, `resources/list`,
  *   `resources/read`, `prompts/list`, `prompts/get` and `ping`.
  *
+ *   The tools of the clients of the bus live in the same list: an editor that published
+ *   its tools with `tools.register` gives the server tools it cannot have by itself — the
+ *   file system of the editor, the terminal of the editor. The names of those tools carry
+ *   the name of the client: `vscode__read_file`.
+ *
  *   Three rules keep the server honest:
  *
  *   1. a tool that the configuration forbids is not listed and not called;
@@ -19,8 +24,8 @@
  * @depends node:http, tools/tools, tools/context, shared/format
  * @usedBy cli, server/serve, server/stdio
  * @exports MCP_PROTOCOL_VERSION, MCP_SUPPORTED_PROTOCOLS, MCP_ERROR, MCP_RESOURCES,
- *          MCP_PROMPTS, mcpToolList, createMcpServer, createMcpHttpHandler,
- *          startHttpServer, newMcpToken, errorResponse
+ *          MCP_PROMPTS, mcpToolList, mcpClientToolList, createMcpServer,
+ *          createMcpHttpHandler, startHttpServer, newMcpToken, errorResponse
  * @ai.tags mcp, jsonrpc, server
  * @ai.hint io
  */
@@ -118,9 +123,39 @@ export function mcpToolList(names = TOOL_NAMES) {
 }
 
 /**
+ * The catalog of the tools of the clients in the shape of MCP.
+ *
+ * The hub keeps the tools of every client of the bus. The names of the tools carry the
+ * name of the client, so two clients may have a tool with the same name.
+ *
+ * @param {Array<{ name: string, description?: string, parameters?: object }>} [tools]
+ * @returns {{ name: string, description: string, inputSchema: object }[]}
+ * @exports
+ * @ai.hint pure
+ */
+export function mcpClientToolList(tools = []) {
+    const out = [];
+    for (const tool of Array.isArray(tools) ? tools : []) {
+        const name = typeof tool?.name === 'string' ? tool.name.trim() : '';
+        if (!name) continue;
+        out.push({
+            name,
+            description: typeof tool?.description === 'string' && tool.description.trim()
+                ? tool.description
+                : `The tool ${name} of the client of the bus.`,
+            inputSchema: tool?.parameters && typeof tool.parameters === 'object'
+                ? tool.parameters
+                : { type: 'object', properties: {} },
+        });
+    }
+    return out;
+}
+
+/**
  * Create the server of the protocol.
  *
  * @param {{ root?: string, config?: object|null, timeoutMs?: number, callTool?: Function|null,
+ *           listClientTools?: Function|null, callClientTool?: Function|null,
  *           name?: string, version?: string }} [options]
  * @returns {{ handle: (message: unknown) => Promise<object|object[]|null>,
  *             listTools: () => object[], close: () => void }}
@@ -132,6 +167,8 @@ export function createMcpServer({
     config = null,
     timeoutMs = 120_000,
     callTool = null,
+    listClientTools = null,
+    callClientTool = null,
     name = 'ai-serve',
     version = '0.3.0',
 } = {}) {
@@ -149,11 +186,29 @@ export function createMcpServer({
     const allowed = (toolName) => toolAllowed(toolName, config);
 
     /**
-     * The tools the server shows: the ones the configuration allows.
+     * The tools of the clients of the bus.
      * @returns {{ name: string, description: string, inputSchema: object }[]}
      * @ai.hint pure
      */
-    const listTools = () => mcpToolList(TOOL_NAMES.filter((toolName) => allowed(toolName)));
+    const clientTools = () => {
+        if (typeof listClientTools !== 'function') return [];
+        try {
+            return mcpClientToolList(listClientTools());
+        } catch {
+            return [];
+        }
+    };
+
+    /**
+     * The tools the server shows: the ones the configuration allows, and the tools of the
+     * clients of the bus.
+     * @returns {{ name: string, description: string, inputSchema: object }[]}
+     * @ai.hint pure
+     */
+    const listTools = () => [
+        ...mcpToolList(TOOL_NAMES.filter((toolName) => allowed(toolName))),
+        ...clientTools(),
+    ];
 
     /**
      * The answer of `resources/read`.
@@ -201,7 +256,38 @@ export function createMcpServer({
     };
 
     /**
+     * Run a tool of a client of the bus.
+     *
+     * The client owns the tool, so the client runs it. The answer has the same shape as
+     * the answer of the tools of the package: the text of the tool and the files it
+     * touched.
+     *
+     * @param {string} toolName
+     * @param {object} args
+     * @param {{ signal?: AbortSignal|null }} [options]
+     * @returns {Promise<object>}
+     * @ai.hint io
+     */
+    const runClientTool = async (toolName, args, { signal = null } = {}) => {
+        if (typeof callClientTool !== 'function') {
+            throw new Error(`The tool ${toolName} belongs to a client, and no client is connected.`);
+        }
+        const answer = await callClientTool(toolName, args, { signal });
+        if (!answer || typeof answer !== 'object') return { text: '', summary: '', changes: [] };
+        return {
+            text: typeof answer.output === 'string'
+                ? answer.output
+                : typeof answer.summary === 'string' ? answer.summary : '',
+            summary: typeof answer.summary === 'string' ? answer.summary : '',
+            changes: Array.isArray(answer.changes) ? answer.changes : [],
+        };
+    };
+
+    /**
      * The answer of `tools/call`.
+     *
+     * The tool is either a tool of the package or a tool of a client of the bus.
+     *
      * @param {string|number|null} id
      * @param {object} params
      * @returns {Promise<object|null>}
@@ -212,10 +298,12 @@ export function createMcpServer({
         if (typeof toolName !== 'string' || !toolName) {
             return errorResponse(id, MCP_ERROR.invalidParams, 'The name of the tool is missing.');
         }
-        if (!TOOL_SPECS[toolName]) {
+        const isClientTool = !TOOL_SPECS[toolName]
+            && clientTools().some((tool) => tool.name === toolName);
+        if (!TOOL_SPECS[toolName] && !isClientTool) {
             return errorResponse(id, MCP_ERROR.invalidParams, `There is no tool named ${toolName}.`);
         }
-        if (!allowed(toolName)) {
+        if (!isClientTool && !allowed(toolName)) {
             return errorResponse(id, MCP_ERROR.invalidParams, `The configuration does not allow the tool ${toolName}.`);
         }
         const args = params?.arguments && typeof params.arguments === 'object' ? params.arguments : {};
@@ -229,7 +317,9 @@ export function createMcpServer({
             timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
             timer.unref?.();
         });
-        const work = runTool(toolName, args, { signal: controller.signal })
+        const work = (isClientTool
+            ? runClientTool(toolName, args, { signal: controller.signal })
+            : runTool(toolName, args, { signal: controller.signal }))
             .then((value) => ({ value }), (error) => ({ error }));
 
         try {
