@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 4 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол).
+> Актуальный статус: **шаг 5 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -175,11 +175,12 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/protocol.test.js` — границы окна, отклонение `background|detach|job`, битый JSON
 
 ### step-5 — WebSocket-сервер и файл `serve.json`
-- [ ] `src/server/ws.js` — WebSocket поверх `node:http`: рукопожатие, маска, ping, idle, лимит кадра
-- [ ] `src/server/http.js` — HTTP-часть на том же порту: `/health`, `/v1/complete`, `/v1/structure`, `/v1/tools`
-- [ ] `src/cli.js` — команда `serve`: `--port`, запись `~/.ai-serve/serve.json` (`pid`, `url`, `token`, `0600`), удаление при остановке
-- [ ] Проверка «сервер уже работает» по живому `pid`
-- [ ] `test/serve.test.js` — подъём, `serve.json`, отказ при занятом порте
+- [x] `src/server/ws.js` — WebSocket поверх `node:http`: рукопожатие, маска, ping, idle, лимит кадра
+- [x] `src/server/http.js` — HTTP-часть на том же порту: `/health`, `/v1/complete`, `/v1/structure`, `/v1/tools`
+- [x] `src/server/serve.js` — время жизни сервера: токен, `serve.json` (`pid`, `url`, `token`, `0600`),
+      удаление файла при остановке, отказ «сервер уже работает» по живому `pid`
+- [x] `src/cli.js` — команда `serve`: `--port`, запись `~/.ai-serve/serve.json`, удаление при остановке
+- [x] `test/serve.test.js` — 19 тестов: рукопожатие, `serve.json`, занятый порт, живой `pid`, `/health`, токен
 
 ### step-6 — Хаб шины
 - [ ] `src/server/u2ai.js` — запуск прогона, подписки на события, `run.started`/`run.ended`, `run.event`
