@@ -2,15 +2,17 @@
  * @file src/cli.js
  * @module cli
  * @purpose Parse argv, dispatch the commands, and map the failures to the exit codes.
- * @depends node:module, cli/parser, cli/compatibility, help
+ * @depends node:module, cli/parser, cli/compatibility, config, help
  * @exports EXIT, main
  * @ai.tags cli, dispatch
  * @ai.hint keep
  */
 
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
+import { loadConfig, redactConfig } from './config.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
 const require = createRequire(import.meta.url);
@@ -43,6 +45,25 @@ function pending(command) {
 }
 
 /**
+ * The `config` command: the resolved configuration, with the secrets shortened.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandConfig(opts) {
+    let config;
+    try {
+        config = await loadConfig({ configPath: opts.configPath, cwd: opts.cwd ? path.resolve(opts.cwd) : process.cwd() });
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+    const safe = redactConfig(config);
+    console.log(JSON.stringify(safe, null, 2));
+    return EXIT.ok;
+}
+
+/**
  * Main entry point: parse the arguments and dispatch the command.
  * @param {string[]} argv
  * @returns {Promise<number>} the exit code
@@ -66,6 +87,9 @@ export async function main(argv = process.argv.slice(2)) {
         return EXIT.failure;
     }
 
+    if (opts.command === 'config') {
+        return await commandConfig(opts);
+    }
     if (COMMAND_NAMES.includes(opts.command)) {
         return pending(opts.command);
     }

@@ -146,12 +146,16 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] Проверка: `npm run check` (51 файл), `npm test`, `ai-serve --help`, `ai-serve --version`
 
 ### step-2 — Система конфигурации `~/.ai-serve`
-- [ ] `src/config/constants.js` — enum'ы (режимы approve, категории инструментов, режимы MCP, роли)
-- [ ] `src/config/defaults.js` — дефолты: API, порт, лимиты, инструменты, MCP-серверы, пути, роли
-- [ ] `src/config/parser.js` — разбор `config.json` и `mcp.json`, `{{env:}}`/`{{file:}}`
-- [ ] `src/config/index.js` — `loadConfig`, `ensureConfigFile`, `redactConfig`, пути `~/.ai-serve`
-- [ ] `src/config/validate.js` — проверки с русскими сообщениями (порядок из `u2ai-measurer`)
-- [ ] env-префикс `AI_SERVE_*` (совместимость с `OPENAI_*`, `AI_MODEL`)
+- [x] `src/config/constants.js` — enum'ы (режимы approve, категории инструментов, режимы MCP, роли)
+- [x] `src/config/defaults.js` — дефолты: API, порт, лимиты, инструменты, MCP-серверы, пути, роли
+- [x] `src/config/parser.js` — разбор `config.json` и `mcp.json`, `{{env:}}`/`{{file:}}`
+- [x] `src/config/index.js` — `loadConfig`, `ensureConfigFile`, `redactConfig`, пути `~/.ai-serve`
+- [x] `src/config/validate.js` — проверки с русскими сообщениями (порядок из `u2ai-measurer`)
+- [x] env-префикс `AI_SERVE_*` (совместимость с `OPENAI_*`, `AI_MODEL`)
+- [x] `src/config/{env,merge,paths}.js` — env→поля, глубокое слияние, пути дома
+- [x] `src/config.js` — публичная поверхность конфига
+- [x] `src/cli.js` — команда `config` печатает разрешённый конфиг с укороченными секретами
+- [x] `test/config.test.js` — 16 тестов: приоритеты, плейсхолдеры, русские сообщения
 
 ### step-3 — OpenAI-слой
 - [ ] `src/openai/{fetch,http}.js` — транспорт на чистом `fetch`
