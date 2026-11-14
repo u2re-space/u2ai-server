@@ -261,6 +261,45 @@ catalog stays.
 
 ---
 
+## The access layer
+
+The access is the door between the model and the machine: the files and the commands under
+one root. Both halves work through a backend, so the same rules hold on a native disk, in
+the memory, or over a remote one.
+
+```js
+import { createAccess } from '@u2ai/server';
+
+const access = createAccess({ root: process.cwd() });
+
+await access.fs.writeText('notes/todo.md', '# todo');
+const read = await access.fs.readText('notes/todo.md');
+const found = await access.fs.search({ query: 'todo' });
+
+const answer = await access.exec.run('node', ['--version']);
+```
+
+The rules of the paths live in one place and are never optional: a path may not leave the
+root — neither through `..` nor through a symbolic link — the secret files and the secret
+directories are never accessible, and the read-only directories may be read, but never
+written.
+
+The default backend is Node.js: `node:fs/promises` and `node:child_process`. Another one
+may be put in its place:
+
+```js
+import { createAccess } from '@u2ai/server';
+import { createMemoryBackend } from '@u2ai/server/src/access/memory.js';
+
+const backend = createMemoryBackend();
+const access = createAccess({ root: '/work', fs: backend.fs, exec: backend.exec });
+```
+
+The backend of the files answers `readFile`, `writeFile`, `readdir`, `stat`, `lstat`,
+`realpath`, `unlink`, `mkdir` and `rename`; the backend of the commands answers `run`.
+
+---
+
 ## The programmatic API
 
 The package is also a library. The monolith `ai` uses it to raise the server of the bus.
@@ -294,7 +333,7 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 389 tests
+npm test          # 406 tests
 npm pack --dry-run
 ```
 
