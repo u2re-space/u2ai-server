@@ -400,6 +400,18 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] stdio MCP-сервер расширения (`dist/agent-mcp.mjs`, команда `vext.agent.mcp`)
 - [x] Режим прокси: инструменты редактора видны в MCP пакета под именами `vscode__*`
 
+### step-B3 — Поиск: имена, маска, регулярное выражение
+- [x] `src/tools/filesystem.js` — `globMatcher()`: маска имени (`*`, `**`, `?`); маска без
+      слэша — имя файла, со слэшем — путь от корня
+- [x] `src/tools/filesystem.js` — `searchFiles()`: `inContent=0` ищет по путям и отдаёт сами
+      пути, `inContent=1` грепает текст и отдаёт `путь:строка: текст`; `glob` отсекает
+      файлы до чтения, `regex` читает запрос как регулярное выражение
+- [x] `src/tools/tools.js` — параметры `inContent` и `glob` в каталоге инструментов и в
+      вызове
+- [x] README (EN), planned.md (RU)
+- [x] Проверка: `test/filesystem.test.js` (поиск по именам, маска), `npm test` — 442 теста,
+      все проходят
+
 ---
 
 ## 4. Правила работы

@@ -142,9 +142,36 @@ export async function readTextFile({ root, file, startLine = null, endLine = nul
 }
 
 /**
+ * The matcher of a pattern of the names of the files.
+ *
+ * A pattern is a glob: `*` is any text except the slash, `**` is any text, `?` is one
+ * character. A pattern without a slash matches the name of the file, a pattern with a
+ * slash matches the path of the file from the root.
+ * @param {string} pattern
+ * @returns {RegExp|null}
+ * @exports
+ * @ai.hint pure
+ */
+export function globMatcher(pattern) {
+    const text = String(pattern ?? '').trim();
+    if (!text) return null;
+    const body = text
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*\//g, '(?:.*/)?')
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\?/g, '[^/]');
+    return new RegExp(`^${body}$`, 'i');
+}
+
+/**
  * Find a text in the files of the root.
- * @param {{ root: string, query: string, dir?: string, regex?: boolean, maxResults?: number,
- *           maxFileBytes?: number, includeNoisy?: boolean }} options
+ *
+ * With `inContent` the query is a grep over the text of the files and the hits are
+ * `path:line: text`. Without it the query is matched against the paths of the files and
+ * the hits are the paths themselves. `glob` limits the files by their name.
+ * @param {{ root: string, query: string, dir?: string; regex?: boolean; inContent?: boolean;
+ *           glob?: string; maxResults?: number; maxFileBytes?: number; includeNoisy?: boolean }} options
  * @returns {Promise<{ text: string, count: number, scanned: number, truncated: boolean }>}
  * @exports
  * @ai.hint io
@@ -154,12 +181,17 @@ export async function searchFiles({
     query,
     dir = '.',
     regex = false,
+    inContent = true,
+    glob = '',
     maxResults = 60,
     maxFileBytes = 1024 * 1024,
     includeNoisy = false,
 }) {
     if (typeof query !== 'string' || !query) throw new Error('The query of the search is empty.');
     const { abs, rel } = await resolveInside(root, dir);
+    const names = globMatcher(glob);
+    // A pattern without a slash names the files, a pattern with a slash names the paths.
+    const onName = !String(glob ?? '').trim().includes('/');
     let matcher = null;
     if (regex) {
         try {
@@ -171,6 +203,7 @@ export async function searchFiles({
     const results = [];
     let scanned = 0;
     let truncated = false;
+    const byName = !inContent;
 
     /**
      * Scan the text files under this directory until the limit of the results.
@@ -198,6 +231,19 @@ export async function searchFiles({
             } else if (entry.isFile()) {
                 if (isProtectedFileName(entry.name)) continue;
                 const full = path.join(current, entry.name);
+                // The glob cuts the files before they are read.
+                if (names && !names.test(onName ? entry.name : relative)) continue;
+                if (byName) {
+                    const hit = matcher ? matcher.test(relative) : relative.toLowerCase().includes(query.toLowerCase());
+                    if (!hit) continue;
+                    scanned += 1;
+                    results.push(relative);
+                    if (results.length >= maxResults) {
+                        truncated = true;
+                        break;
+                    }
+                    continue;
+                }
                 const info = await stat(full).catch(() => null);
                 if (!info || info.size > maxFileBytes) continue;
                 if (await isBinaryFile(full, info.size)) continue;

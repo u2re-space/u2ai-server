@@ -182,6 +182,22 @@ test('the search of a wrong regular expression fails', async () => {
   await assert.rejects(() => searchFiles({ root, query: '[', regex: true }), /regular expression/);
 });
 
+test('the search finds the files by their names', async () => {
+  const root = await sampleProject();
+  const out = await searchFiles({ root, query: 'index', inContent: false });
+  assert.equal(out.count, 1);
+  assert.match(out.text, /src\/index\.js/);
+});
+
+test('the search of the names takes a glob', async () => {
+  const root = await sampleProject();
+  const out = await searchFiles({ root, query: 'answer', glob: '*.md' });
+  assert.equal(out.count, 0);
+  const js = await searchFiles({ root, query: 'answer', glob: '*.js' });
+  assert.equal(js.count, 1);
+  assert.match(js.text, /src\/index\.js:1/);
+});
+
 test('the write creates the file and the parents', async () => {
   const root = await tempProject();
   const out = await writeTextFile({ root, file: 'docs/readme.md', content: '# Hi\n' });

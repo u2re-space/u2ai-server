@@ -233,7 +233,7 @@ The methods: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
 |---|---|---|---|
 | `list_files` | read | low | The files and the directories of a path. The noisy folders are skipped. |
 | `read_file` | read | low | A UTF-8 text file, with the numbered lines. |
-| `search_files` | read | low | The text files that hold a string or a regular expression. |
+| `search_files` | read | low | The text files that hold a string or a regular expression. The paths of the files are matched too (`inContent=false`), and a glob (`*.scss`, `src/**/*.js`) cuts the files by their name. |
 | `write_file` | write | medium | Create or overwrite a file. The old version goes to the backup directory. |
 | `replace_in_file` | write | medium | Replace a fragment of a file. |
 | `delete_file` | write | high | Delete a file. The old version goes to the backup directory. |

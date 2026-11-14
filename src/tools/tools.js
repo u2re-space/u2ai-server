@@ -144,12 +144,14 @@ export const TOOL_SPECS = Object.freeze({
         category: 'read',
         group: 'fs',
         risk: 'low',
-        description: 'Search the text files for a string or for a regular expression. The answer holds the matches as "path:line: text".',
+        description: 'Search the files for a string or for a regular expression. The answer holds the matches as "path:line: text". With inContent=false the paths of the files are matched instead of their text.',
         parameters: schema({
             query: str('The text to look for (case-insensitive), or a regular expression when regex is true.'),
             path: nullableStr('The directory to search in, relative to the working directory. Null = the whole root.'),
             regex: bool('Read the query as a regular expression.'),
-        }, ['path', 'regex']),
+            inContent: bool('Search the text of the files. False = match the paths of the files.'),
+            glob: nullableStr('The names of the files to search in, like `*.scss`. Null = every file.'),
+        }, ['path', 'regex', 'inContent', 'glob']),
     },
     write_file: {
         category: 'write',
@@ -617,6 +619,8 @@ export async function executeTool(name, args = {}, { root, config = null, signal
             query: params.query,
             dir: params.path ?? '.',
             regex: params.regex ?? false,
+            inContent: params.inContent !== false,
+            glob: params.glob ?? '',
         }),
         write_file: () => writeTextFile({
             root,
