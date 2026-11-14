@@ -10,7 +10,7 @@
  *   The answers are plain text: the model reads them, not a program. A tool that lists a
  *   tree returns the tree; a tool that reads a file returns numbered lines.
  *
- * @depends node:path, node:fs/promises, agent/access, shared/format
+ * @depends node:path, node:fs/promises, agent/access, access/index, shared/format
  * @usedBy tools/tools, agent/roles, server/mcp
  * @exports listFiles, readTextFile, searchFiles, writeTextFile, replaceInFile, deleteFile,
  *          makeDirectory, copyPath, isBinaryFile
@@ -25,14 +25,13 @@ import {
     writeFile,
     mkdir,
     stat,
-    lstat,
     readdir,
     unlink,
     copyFile,
-    cp,
     open,
 } from 'node:fs/promises';
-import { resolveInside, isInside, isForbiddenDirName, isProtectedFileName, NOISY_DIRS } from '../agent/access.js';
+import { resolveInside, isForbiddenDirName, isProtectedFileName, NOISY_DIRS } from '../agent/access.js';
+import { createAccess } from '../access/index.js';
 import { formatBytes } from '../shared/format.js';
 
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -76,97 +75,26 @@ async function backup(abs, rel, backupDir) {
 }
 
 /**
- * The nearest existing directory at or above the relative path.
- * @param {string} root
- * @param {string} rel the POSIX path relative to the root
- * @returns {Promise<string|null>}
- * @ai.hint io
- */
-async function nearestDirectory(root, rel) {
-    const parts = String(rel).split('/').filter((part) => part && part !== '.');
-    while (parts.length) {
-        parts.pop();
-        const candidate = parts.join('/') || '.';
-        const info = await stat(path.join(root, ...parts)).catch(() => null);
-        if (info?.isDirectory()) return candidate;
-    }
-    return null;
-}
-
-/**
  * List a tree of directories, mark the noisy folders, and stop at the limit.
  *
  * A path that does not exist yet lists the nearest existing parent instead of failing:
  * a probe of a directory that `write_file` will create still answers with a tree.
+ *
+ * The walk itself belongs to the access layer: the tool asks the system for the listing
+ * and only keeps the shape the model reads.
  * @param {{ root: string, dir?: string, depth?: number, includeHidden?: boolean, maxEntries?: number }} options
  * @returns {Promise<{ text: string, count: number, truncated: boolean, missing?: string }>}
  * @exports
  * @ai.hint io
  */
 export async function listFiles({ root, dir = '.', depth = 2, includeHidden = false, maxEntries = 400 }) {
-    const { abs, rel } = await resolveInside(root, dir);
-    const info = await stat(abs).catch(() => null);
-    if (!info) {
-        const parent = await nearestDirectory(root, rel);
-        if (!parent) throw new Error(`The directory is not found: ${dir}`);
-        const listing = await listFiles({ root, dir: parent, depth, includeHidden, maxEntries });
-        const where = parent === '.' ? 'the root of the project' : `the directory ${parent}`;
-        return {
-            text: `The directory is not found: ${rel}. write_file will create it when it writes the file. The content of ${where}:\n${listing.text}`,
-            count: listing.count,
-            truncated: listing.truncated,
-            missing: rel,
-        };
-    }
-    if (!info.isDirectory()) throw new Error(`It is not a directory: ${dir}`);
-    const lines = [];
-    let truncated = false;
-
-    /**
-     * List one level and go deeper until the depth is reached.
-     * @param {string} current
-     * @param {string} prefix
-     * @param {number} level
-     * @returns {Promise<void>}
-     * @ai.hint io
-     */
-    async function walk(current, prefix, level) {
-        if (truncated) return;
-        let entries;
-        try {
-            entries = await readdir(current, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        entries.sort((a, b) => (a.isDirectory() === b.isDirectory()
-            ? a.name.localeCompare(b.name)
-            : a.isDirectory() ? -1 : 1));
-        for (const entry of entries) {
-            if (!includeHidden && entry.name.startsWith('.') && entry.name !== '.github') continue;
-            const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-            if (lines.length >= maxEntries) {
-                truncated = true;
-                return;
-            }
-            if (entry.isDirectory()) {
-                const skip = NOISY_DIRS.test(entry.name);
-                lines.push(`${relative}/${skip ? '  (skipped)' : ''}`);
-                if (!skip && level < depth) await walk(path.join(current, entry.name), relative, level + 1);
-            } else if (entry.isFile()) {
-                const size = await stat(path.join(current, entry.name)).then((info2) => info2.size).catch(() => 0);
-                lines.push(`${relative}  (${formatBytes(size)})`);
-            } else if (entry.isSymbolicLink()) {
-                lines.push(`${relative}  (symlink)`);
-            }
-        }
-    }
-
-    await walk(abs, rel === '.' ? '' : rel, 1);
-    const note = truncated ? `\n…the list is cut (${maxEntries} entries)` : '';
+    const access = createAccess({ root });
+    const listing = await access.fs.listFiles(dir, { depth, limit: maxEntries, includeHidden });
     return {
-        text: `${lines.join('\n') || '(empty)'}${note}`,
-        count: lines.length,
-        truncated,
+        text: listing.text,
+        count: listing.count,
+        truncated: listing.truncated,
+        ...(listing.missing ? { missing: listing.missing } : {}),
     };
 }
 
@@ -411,47 +339,15 @@ export async function makeDirectory({ root, dir }) {
 
 /**
  * Copy a file or a tree, without touching the content.
+ *
+ * The copy belongs to the access layer: the rules of the paths (no secret, no symbolic
+ * link, no directory into itself) are the rules of the system, and the tool only asks.
  * @param {{ root: string, source: string, destination: string }} options
  * @returns {Promise<{ source: string, destination: string, type: 'file'|'directory' }>}
  * @exports
  * @ai.hint io
  */
 export async function copyPath({ root, source, destination }) {
-    const from = await resolveInside(root, source, { allowRoot: false });
-    const to = await resolveInside(root, destination, { forWrite: true, allowRoot: false });
-    const info = await lstat(from.abs).catch(() => null);
-    if (!info) throw new Error(`The source is not found: ${source}`);
-    if (info.isSymbolicLink()) throw new Error(`The copy of a symbolic link is denied: ${from.rel}`);
-    if (!info.isFile() && !info.isDirectory()) throw new Error(`The source must be a file or a directory: ${from.rel}`);
-    const target = path.resolve(to.abs);
-    if (info.isDirectory() && isInside(from.abs, target)) throw new Error('A directory cannot be copied into itself.');
-
-    /**
-     * Check the tree: no secret, no forbidden directory, no symbolic link.
-     * @param {string} abs
-     * @param {string} rel
-     * @returns {Promise<void>}
-     * @ai.hint io
-     */
-    async function validateTree(abs, rel) {
-        const current = await lstat(abs);
-        const name = path.basename(abs);
-        if (isForbiddenDirName(name)) throw new Error(`The access is denied: ${rel}`);
-        if (current.isSymbolicLink()) throw new Error(`The copy of a symbolic link is denied: ${rel}`);
-        if (current.isFile() && isProtectedFileName(name)) throw new Error(`The file with the secret is not accessible: ${rel}`);
-        if (current.isDirectory()) {
-            for (const entry of await readdir(abs, { withFileTypes: true })) {
-                await validateTree(path.join(abs, entry.name), `${rel}/${entry.name}`);
-            }
-        } else if (!current.isFile()) {
-            throw new Error(`The type of the file is not supported: ${rel}`);
-        }
-    }
-
-    await validateTree(from.abs, from.rel);
-    const targetInfo = await lstat(to.abs).catch(() => null);
-    if (targetInfo) throw new Error(`The path of the destination already exists: ${to.rel}`);
-    await mkdir(path.dirname(to.abs), { recursive: true });
-    await cp(from.abs, to.abs, { recursive: true, errorOnExist: true, force: false, dereference: false });
-    return { source: from.rel, destination: to.rel, type: info.isDirectory() ? 'directory' : 'file' };
+    const access = createAccess({ root });
+    return await access.fs.copy(source, destination);
 }

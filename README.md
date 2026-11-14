@@ -369,6 +369,9 @@ await access.fs.writeText('notes/todo.md', '# todo');
 const read = await access.fs.readText('notes/todo.md');
 const found = await access.fs.search({ query: 'todo' });
 
+const listing = await access.fs.listFiles('src', { depth: 2, limit: 400 });
+const copied = await access.fs.copy('src/app.js', 'lib/app.js');
+
 const answer = await access.exec.run('node', ['--version']);
 ```
 
@@ -376,6 +379,12 @@ The rules of the paths live in one place and are never optional: a path may not 
 root — neither through `..` nor through a symbolic link — the secret files and the secret
 directories are never accessible, and the read-only directories may be read, but never
 written.
+
+`listFiles` returns the tree of a path as the model reads it: the noisy folders are marked
+and not opened, the dot-files are hidden unless they are asked for, the sizes are in the
+text, and a path that does not exist yet answers with the nearest existing parent.
+`copy` copies a file or a tree under the same rules: no secret, no symbolic link, no
+directory into itself, and the destination must not exist unless `overwrite` is asked for.
 
 The default backend is Node.js: `node:fs/promises` and `node:child_process`. Another one
 may be put in its place:
@@ -389,7 +398,9 @@ const access = createAccess({ root: '/work', fs: backend.fs, exec: backend.exec 
 ```
 
 The backend of the files answers `readFile`, `writeFile`, `readdir`, `stat`, `lstat`,
-`realpath`, `unlink`, `mkdir` and `rename`; the backend of the commands answers `run`.
+`realpath`, `unlink`, `mkdir`, `rename` and `copy`; the backend of the commands answers
+`run`. The state of a path is a plain object with the properties (`isDirectory`, `isFile`,
+`isSymbolicLink`), not the methods of Node.js: every backend answers in one shape.
 
 ---
 

@@ -199,7 +199,7 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 ### step-8 — Терминал и команды
 - [x] `src/tools/terminal.js` — `runCommand`, `runProgram`, оболочки (`powershell`, `pwsh`, `cmd`, `bash`, `sh`, `zsh`), таймауты, лимит вывода
 - [x] `src/tools/command-risk.js` — оценка риска текста команды, переписывание опасных формулировок
-- [x] `src/tools/file-commands.js` — `FILE_COMMANDS_SCHEMA`, пакет `fs:read` / `fs:write` / `fs:list`
+- [x] `src/tools/file-commands.js` — `FILE_COMMANDS_SCHEMA`, пакет `fs:read` / `fs:write` / `fs:list` / `fs:copy`
 - [x] `src/tools/cache.js` — кэш результатов инструментов в рамках прогона
 - [x] `src/tools/tools.js` — каталог: `run_command`, `run_script`, категория `exec`, риск `high`
 - [x] `test/terminal.test.js` — 30 тестов: запуск, таймаут, усечение вывода, отмена, секреты окружения, риск, пакет, кэш
@@ -312,6 +312,17 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `src/index.js` — публичные экспорты не изменились: `startStdioServer`, `startNodeServer`
 - [x] `test/stdio.test.js` — 9 тестов: обе стороны транспорта, битая строка, уведомление, смерть ребёнка, CLI `mcp`
 - [x] `npm test` — 398 тестов: 397 проходят, 1 пропущен, 0 падений
+
+### step-21 — Копирование и список файлов в слое доступа
+- [x] `src/access/native.js` — операция `copy` через `cp` из `node:fs/promises` (`dereference: false`); `stat` и `lstat` отдают свойства (`isDirectory`, `isFile`, `isSymbolicLink`), а не методы Node.js
+- [x] `src/access/memory.js` — операция `copy` с копированием поддерева; `readdir`, `stat` и `lstat` в том же виде
+- [x] `src/access/fs.js` — `listFiles(relative, { depth, limit, includeHidden })` и `copy(source, destination, { overwrite })`; правила путей, секреты, запрет симлинков и копирования каталога в себя
+- [x] `src/tools/filesystem.js` — `listFiles` и `copyPath` делегируют слою доступа
+- [x] `src/tools/file-commands.js` — команда `fs:copy` в пакете; `destination` обязателен для неё
+- [x] MCP — `list_files` и `copy_path` идут через слой доступа автоматически (сервер зовёт `executeTool`)
+- [x] `test/access.test.js`, `test/terminal.test.js`, `test/mcp.test.js` — тесты слоя доступа, пакета и MCP
+- [x] Копия `src/access/*` — в `u2ai-webdev`, `u2ai-decomposer`, `u2ai-measurer`, `u2ai-images`
+- [x] `npm test` — 440 тестов: 439 проходят, 1 пропущен, 0 падений
 
 ---
 

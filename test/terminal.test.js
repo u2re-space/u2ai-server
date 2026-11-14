@@ -225,6 +225,21 @@ test('the file commands refuse a path outside the root before they run', async (
   await assert.rejects(() => readFile(path.join(root, '..', 'evil.txt')), /ENOENT/);
 });
 
+test('the file commands copy a file in a batch', async () => {
+  const root = await tempProject();
+  await writeFile(path.join(root, 'a.txt'), 'one\n', 'utf8');
+  const out = await executeFileCommands({
+    root,
+    commands: [
+      { command: 'fs:copy', path: 'a.txt', destination: 'b.txt' },
+      { command: 'fs:list', path: '.' },
+    ],
+  });
+  assert.equal(out.results.length, 2);
+  assert.deepEqual(out.written, ['b.txt']);
+  assert.equal(await readFile(path.join(root, 'b.txt'), 'utf8'), 'one\n');
+});
+
 test('the file commands refuse a wrong shape', async () => {
   const root = await tempProject();
   await assert.rejects(
@@ -239,6 +254,8 @@ test('the schema of the file commands is strict', () => {
   const item = FILE_COMMANDS_SCHEMA.properties.commands.items;
   assert.equal(item.additionalProperties, false);
   assert.ok(item.properties.command.enum.includes('fs:write'));
+  assert.ok(item.properties.command.enum.includes('fs:copy'));
+  assert.deepEqual(item.required, ['command', 'path']);
 });
 
 test('the terminal tools are in the catalog with the exec category', () => {

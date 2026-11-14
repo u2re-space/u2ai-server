@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -153,6 +153,87 @@ test('the files over the native backend: the write and the read on the disk', as
     assert.equal(read.text, 'export const answer = 42;\n');
     const list = await access.fs.list('src');
     assert.deepEqual(list.entries.map((entry) => entry.path), ['src/index.js']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('the files over the backend in the memory: the listing of the files', async () => {
+  const backend = createMemoryBackend();
+  const access = createAccess({ root: '/work', fs: backend.fs, exec: backend.exec });
+
+  await access.fs.writeText('src/app.js', 'const answer = 42;\n');
+  await access.fs.writeText('README.md', '# demo\n');
+
+  const listing = await access.fs.listFiles('.');
+  assert.match(listing.text, /src\//);
+  assert.match(listing.text, /README\.md/);
+  assert.equal(listing.count, 3);
+  assert.equal(listing.truncated, false);
+
+  const deep = await access.fs.listFiles('.', { depth: 3 });
+  assert.deepEqual(deep.entries.map((entry) => entry.path), ['src', 'src/app.js', 'README.md']);
+});
+
+test('the files over the backend in the memory: the copy of a file and of a tree', async () => {
+  const backend = createMemoryBackend();
+  const access = createAccess({ root: '/work', fs: backend.fs, exec: backend.exec });
+
+  await access.fs.writeText('src/app.js', 'const answer = 42;\n');
+
+  const file = await access.fs.copy('src/app.js', 'lib/app.js');
+  assert.equal(file.type, 'file');
+  assert.equal(file.source, 'src/app.js');
+  assert.equal(file.destination, 'lib/app.js');
+  assert.equal((await access.fs.readText('lib/app.js')).text, 'const answer = 42;\n');
+
+  const tree = await access.fs.copy('src', 'source');
+  assert.equal(tree.type, 'directory');
+  assert.equal((await access.fs.readText('source/app.js')).text, 'const answer = 42;\n');
+});
+
+test('the files over the backend in the memory: the copy refuses the refused paths', async () => {
+  const backend = createMemoryBackend();
+  const access = createAccess({ root: '/work', fs: backend.fs, exec: backend.exec });
+
+  await access.fs.writeText('src/app.js', 'const answer = 42;\n');
+
+  await assert.rejects(() => access.fs.copy('../outside.js', 'here.js'), /outside the working directory/);
+  await assert.rejects(() => access.fs.copy('src', 'src/inside'), /into itself/);
+  await assert.rejects(() => access.fs.copy('src/app.js', 'src/app.js'), /already exists/);
+});
+
+test('the copy never carries a secret away', async () => {
+  const root = await tempDir();
+  try {
+    await mkdir(path.join(root, 'bundle'), { recursive: true });
+    await writeFile(path.join(root, 'bundle', '.env'), 'SECRET=1\n', 'utf8');
+    const access = createAccess({ root });
+    await assert.rejects(() => access.fs.copy('bundle', 'copy'), /secret/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('the files over the native backend: the listing of the files and the copy', async () => {
+  const root = await tempDir();
+  try {
+    await mkdir(path.join(root, 'src'), { recursive: true });
+    await writeFile(path.join(root, 'src', 'index.js'), 'export const answer = 42;\n', 'utf8');
+    await writeFile(path.join(root, 'README.md'), '# demo\n', 'utf8');
+    const access = createAccess({ root });
+
+    const listing = await access.fs.listFiles('.');
+    assert.match(listing.text, /README\.md/);
+    assert.match(listing.text, /src\//);
+
+    const file = await access.fs.copy('README.md', 'docs/README.md');
+    assert.equal(file.type, 'file');
+    assert.equal(await readFile(path.join(root, 'docs', 'README.md'), 'utf8'), '# demo\n');
+
+    const tree = await access.fs.copy('src', 'lib');
+    assert.equal(tree.type, 'directory');
+    assert.match(await readFile(path.join(root, 'lib', 'index.js'), 'utf8'), /answer/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

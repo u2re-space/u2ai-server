@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -119,6 +119,30 @@ test('a tool that fails answers with the error and not with a crash', async () =
   });
   assert.equal(answer.result.isError, true);
   assert.match(answer.result.content[0].text, /not found/);
+});
+
+test('the files of the root are listed and copied through the tools of the server', async () => {
+  const root = await tempProject();
+  await writeFile(path.join(root, 'a.txt'), 'one\n', 'utf8');
+  const server = createMcpServer({ root });
+
+  const listed = await server.handle({
+    jsonrpc: '2.0',
+    id: 13,
+    method: 'tools/call',
+    params: { name: 'list_files', arguments: { path: '.' } },
+  });
+  assert.notEqual(listed.result.isError, true);
+  assert.match(listed.result.content[0].text, /a\.txt/);
+
+  const copied = await server.handle({
+    jsonrpc: '2.0',
+    id: 14,
+    method: 'tools/call',
+    params: { name: 'copy_path', arguments: { source: 'a.txt', destination: 'b.txt' } },
+  });
+  assert.notEqual(copied.result.isError, true);
+  assert.equal(await readFile(path.join(root, 'b.txt'), 'utf8'), 'one\n');
 });
 
 test('the list of the resources holds the three views of the server', async () => {
