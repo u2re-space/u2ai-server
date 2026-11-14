@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 12 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент).
+> Актуальный статус: **шаг 13 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -241,10 +241,15 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/roles.test.js` — 22 теста: настройки роли, разбор задачи, план, выбор и вызов инструмента, шаги плана, лимит ходов, callable
 
 ### step-13 — Tab-autocomplete
-- [ ] `src/agent/autocomplete.js` — сбор окна документа (до 262144 байт; иначе строки `line-200…line+50`), деление окна при >900000 байт
-- [ ] `src/agent/autocomplete.js` — промпт дополнения, чистка вставки (`stripCompletion`, `fitInsertion`)
-- [ ] `src/server/http.js` — `POST /v1/complete` (проверка токена), `WS /v1/complete?token=` для расширения
-- [ ] `test/autocomplete.test.js` — окно, курсор в срезе, отказ на гигантской строке
+- [x] `src/agent/autocomplete.js` — сбор окна документа (до 262144 байт; иначе строки `line-200…line+50`), деление окна при >900000 байт
+- [x] `src/agent/autocomplete.js` — промпт дополнения, чистка вставки (`stripCompletion`, `fitInsertion`, `acceptInsertion`, `stripDoubledClosers`)
+- [x] `src/agent/autocomplete.js` — `AutocompleteError` с кодом `line_too_long` на строке курсора больше 512 КиБ
+- [x] `src/server/http.js` — `POST /v1/complete` (проверка токена), `WS /v1/complete?token=` для расширения
+- [x] `src/server/u2ai.js` — `attachCompletionSocket`: сокет дополнения без `hello`, кадр `complete` → `completion`
+- [x] `src/server/ws.js` — запрос апгрейда передаётся в обработчик соединения (`req`)
+- [x] `src/server/serve.js` — маршрут `/v1/complete` уходит в мост дополнения, токен проверяется
+- [x] `src/cli.js` — команда `complete`: разовое дополнение файла (`--file`, `--line`, `--language`)
+- [x] `test/autocomplete.test.js` — 19 тестов: окно, курсор в срезе, отказ на гигантской строке, чистка вставки, HTTP- и WebSocket-мост
 
 ### step-14 — Обработка инструментов в шине
 - [ ] `src/server/u2ai.js` — `tool.request` → `tool.result`, таймаут запроса

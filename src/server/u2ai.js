@@ -16,7 +16,7 @@
  *
  * @depends node:crypto, shared/protocol, shared/decoder, shared/encoder
  * @usedBy server/serve, cli
- * @exports createHub, attachConnection
+ * @exports createHub, attachConnection, attachCompletionSocket
  * @ai.tags websocket, runs, hub
  * @ai.hint io
  */
@@ -576,4 +576,58 @@ export function attachConnection(hub, connection) {
     });
     connection.on('close', () => hub.disconnect(socket));
     return socket;
+}
+
+/**
+ * Attach one socket to the bridge of the completion.
+ *
+ * The socket of the completion is not a client of the bus: it does not say `hello` and it
+ * does not start runs. It sends `complete` frames and reads the answer of the model. The
+ * token of the server is checked by the caller, before the socket is attached — the token
+ * travels in the query of the upgrade.
+ *
+ * @param {import('./ws.js').WsConnection} connection
+ * @param {{ onComplete: Function }} options
+ * @returns {void}
+ * @exports
+ * @ai.hint io
+ */
+export function attachCompletionSocket(connection, { onComplete } = {}) {
+    /**
+     * Send one frame of the bridge.
+     * @param {object} frame
+     * @returns {void}
+     * @ai.hint pure
+     */
+    const send = (frame) => {
+        try { connection.send(encodeFrame(frame)); } catch { /* the socket is gone */ }
+    };
+
+    connection.on('message', (text) => {
+        const answer = decodeFrame(text);
+        if (!answer.ok) {
+            send(errorFrame(answer.code, answer.message));
+            return;
+        }
+        const frame = answer.frame;
+        if (frame.type !== 'complete') {
+            send(errorFrame('bad_request', 'The completion socket takes complete frames only.'));
+            return;
+        }
+        if (typeof onComplete !== 'function') {
+            send(errorFrame('not_ready', 'The completion bridge is not running yet.'));
+            return;
+        }
+        void Promise.resolve(onComplete(frame))
+            .then((result) => {
+                send({
+                    type: 'completion',
+                    id: typeof frame.id === 'string' ? frame.id : null,
+                    text: String(result?.text ?? result ?? ''),
+                });
+            })
+            .catch((error) => {
+                send(errorFrame('completion_failed', error?.message ?? 'The completion failed.'));
+            });
+    });
 }

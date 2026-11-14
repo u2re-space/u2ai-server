@@ -333,7 +333,7 @@ export function listenWebSocket({
             '',
         ].join('\r\n'));
         const connection2 = new WsConnection(socket, { maxFrameBytes, pingIntervalMs, idleMs });
-        onConnection(connection2, head);
+        onConnection(connection2, head, req);
     });
 
     return new Promise((resolve, reject) => {

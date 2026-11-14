@@ -111,7 +111,7 @@ export {
 } from './server/ws.js';
 export { HTTP_ROUTES, checkToken, requestToken, readJsonBody, createHttpHandler } from './server/http.js';
 export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServe } from './server/serve.js';
-export { createHub, attachConnection } from './server/u2ai.js';
+export { createHub, attachConnection, attachCompletionSocket } from './server/u2ai.js';
 export {
     MCP_PROTOCOL_VERSION,
     MCP_SUPPORTED_PROTOCOLS,
@@ -231,3 +231,15 @@ export {
 } from './roles/tooler.js';
 export { SUGGESTER_SCHEMA, suggesterPrompt, shapeSuggestion, suggestAnswer } from './roles/suggester.js';
 export { CALLABLE_INSTRUCTIONS, callablePrompt, runCallable } from './agent/callable.js';
+export {
+    COMPLETION_INSTRUCTIONS,
+    MAX_LINE_BYTES,
+    AutocompleteError,
+    buildCompletionContext,
+    completionPrompt,
+    stripCompletion,
+    stripDoubledClosers,
+    acceptInsertion,
+    fitInsertion,
+    completeAtCursor,
+} from './agent/autocomplete.js';

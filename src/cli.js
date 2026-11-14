@@ -9,6 +9,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
@@ -19,6 +20,7 @@ import { serveFile } from './config/paths.js';
 import { createHub } from './server/u2ai.js';
 import { createMcpServer, startStdioServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { createClient } from './openai/client.js';
+import { completeAtCursor } from './agent/autocomplete.js';
 import { ROLE_NAMES, runRole, runAgent } from './roles/index.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
@@ -130,6 +132,19 @@ async function commandServe(opts) {
         },
     });
 
+    // The bridge of the completion. The client of the API is made on the first request,
+    // so the server starts even when the keys of the backends are not set yet.
+    let clientPromise = null;
+    const completionClient = () => {
+        if (!clientPromise) clientPromise = createClient({ config, env: process.env });
+        return clientPromise;
+    };
+    const onComplete = async (frame) => {
+        const client = await completionClient();
+        const out = await completeAtCursor({ client, config, frame });
+        return { id: out.id, text: out.text };
+    };
+
     let handle;
     try {
         handle = await startServe({
@@ -139,6 +154,7 @@ async function commandServe(opts) {
             host: config.server?.host ?? '127.0.0.1',
             token,
             hub,
+            onComplete,
             // The MCP endpoint of the server: the same port and the same token.
             mcp: createMcpServer({ root: cwd, config }),
         });
@@ -381,6 +397,70 @@ function printRoleResult(role, out, asJson) {
 }
 
 /**
+ * The `complete` command: one completion for a file and a line, printed to the stdout.
+ *
+ * The cursor is at the end of the line: the command continues the line, as the Tab of the
+ * editor does. The answer is the text to insert and nothing else.
+ *
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandComplete(opts) {
+    const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
+    const file = opts.file ?? opts.positionals[0] ?? null;
+    if (!file) return usage('The command `complete` needs a file: --file <path>.');
+
+    const line = Number(opts.line ?? 1);
+    if (!Number.isSafeInteger(line) || line < 1) return usage('--line: 1..');
+
+    const target = path.resolve(cwd, file);
+    let content;
+    try {
+        content = await readFile(target, 'utf8');
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+
+    let config;
+    try {
+        config = await loadConfig({ configPath: opts.configPath, cwd });
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+
+    const rows = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const index = Math.min(line - 1, Math.max(0, rows.length - 1));
+    const cursor = { line: index, character: (rows[index] ?? '').length };
+
+    try {
+        const client = await createClient({ config, env: process.env });
+        const out = await completeAtCursor({
+            client,
+            config,
+            frame: {
+                id: 'cli',
+                content,
+                cursor,
+                path: path.relative(cwd, target) || target,
+                language: opts.language ?? undefined,
+            },
+        });
+        if (opts.json) {
+            console.log(JSON.stringify({ id: out.id, text: out.text }, null, 2));
+            return EXIT.ok;
+        }
+        process.stdout.write(out.text);
+        return EXIT.ok;
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+}
+
+/**
  * Main entry point: parse the arguments and dispatch the command.
  * @param {string[]} argv
  * @returns {Promise<number>} the exit code
@@ -415,6 +495,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (opts.command === 'agent') {
         return await commandAgent(opts);
+    }
+    if (opts.command === 'complete') {
+        return await commandComplete(opts);
     }
     if (COMMAND_NAMES.includes(opts.command)) {
         return pending(opts.command);

@@ -35,6 +35,7 @@ Commands:
   tools                List the tools of the package (name, category, risk).
   agent <task>         Run a one-off task as an AI agent.
   complete             Print a one-off completion for a file and a line.
+                       Use --file <path> and --line <n> (1-based).
   services             List the external services (ai-serve and MCP) and their state.
   config               Print the resolved configuration.
   doctor               Check the environment: Node, config, keys, port, services.
@@ -43,6 +44,9 @@ Options:
       --port <n>       The port to listen on (default: a free port).
       --cwd <dir>      The working directory of the task.
       --role <name>    The role of the agent: analyzer, director, executor, tooler, suggester.
+  -f, --file <path>    The file of the completion.
+      --line <n>       The line of the completion (1-based).
+      --language <id>  The language of the file (for example js, ts, py).
       --http           The MCP server speaks HTTP instead of stdio.
       --stdio          The MCP server speaks stdio (default).
   -c, --config <file>   The config file to use.

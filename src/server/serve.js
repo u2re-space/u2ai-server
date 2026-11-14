@@ -23,10 +23,11 @@ import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { serveFile } from '../config/paths.js';
 import { listenWebSocket } from './ws.js';
-import { createHttpHandler } from './http.js';
+import { createHttpHandler, checkToken } from './http.js';
 import { createMcpHttpHandler } from './mcp.js';
-import { attachConnection } from './u2ai.js';
+import { attachConnection, attachCompletionSocket } from './u2ai.js';
 import { PROTOCOL_VERSION, MAX_FRAME_BYTES } from '../shared/protocol.js';
+import { encodeFrame, errorFrame } from '../shared/encoder.js';
 
 /** The mode of the file with the token: only the owner may read it. */
 export const SERVE_FILE_MODE = 0o600;
@@ -106,6 +107,52 @@ function notReadyConnection(connection) {
 }
 
 /**
+ * The path of the request: the part before the query.
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {string}
+ * @ai.hint pure
+ */
+function requestPath(req) {
+    try {
+        return new URL(String(req?.url ?? '/'), 'http://127.0.0.1').pathname;
+    } catch {
+        return '/';
+    }
+}
+
+/**
+ * The connection handler of the server.
+ *
+ * The socket of the path `/v1/complete` is the bridge of the completion: it does not join
+ * the bus and it needs the token of the server in the query. Every other socket is a
+ * client of the bus.
+ *
+ * @param {{ hub: object|null, onComplete: Function|null, tokens: string[] }} options
+ * @returns {(connection: object, head: Buffer|null, req: object) => void}
+ * @ai.hint pure
+ */
+function connectionHandler({ hub, onComplete, tokens }) {
+    return (connection, head, req) => {
+        if (requestPath(req) === '/v1/complete') {
+            if (!checkToken(req, tokens)) {
+                try {
+                    connection.send(encodeFrame(errorFrame('unauthorized', 'The token of the server is needed.')));
+                } catch { /* the socket is gone */ }
+                connection.close(1008);
+                return;
+            }
+            attachCompletionSocket(connection, { onComplete });
+            return;
+        }
+        if (hub) {
+            attachConnection(hub, connection);
+            return;
+        }
+        notReadyConnection(connection);
+    };
+}
+
+/**
  * Start the server: the bus, the HTTP part and the file with the address.
  *
  * @param {{ home: string, config?: object|null, port?: number, host?: string, token?: string,
@@ -165,7 +212,7 @@ export async function startServe({
         listener = await listenWebSocket({
             port,
             host,
-            onConnection: onConnection ?? (hub ? (connection) => attachConnection(hub, connection) : notReadyConnection),
+            onConnection: onConnection ?? connectionHandler({ hub, onComplete, tokens }),
             onRequest: handler,
             onUpgrade,
             pingIntervalMs: config?.server?.pingIntervalMs ?? 30_000,
