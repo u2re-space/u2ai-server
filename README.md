@@ -227,6 +227,42 @@ model submits the schema of the role or when the limit of the turns is reached
 
 ---
 
+## The agent behind the bus
+
+The bus carries the runs of the clients. The agent of the package answers them:
+
+| Command | What it does | Tools |
+|---|---|---|
+| `ask` | Answers the question of the client. | none |
+| `run` | Does the work of the client with the tools. | the catalog of the configuration |
+| `chat` | Keeps the thread of the conversation until the client stops it. | the catalog of the configuration |
+| `image` | Answers with a warning: the package has no image generator. | none |
+
+The tools of the model go through the hub: a client that holds a tool runs it itself, and
+the server runs the tools that nobody holds. Every step of the work is published to the
+bus as an event, so the editor sees the life of the run:
+
+| Event | What it carries |
+|---|---|
+| `text.delta` | A piece of the answer of the model. |
+| `reasoning.delta` | A piece of the thinking of the model. |
+| `tool.exec.start` | The tool the model asks for. |
+| `tool.exec.done` | The answer of the tool: `ok`, `summary`, `changes`. |
+| `text.done` | The whole answer. |
+| `response.done` | The usage of the tokens and the model that answered. |
+| `warning`, `error` | What went wrong. |
+
+The agent is also a library:
+
+```js
+import { createHub, createServerAgent } from '@u2ai/server';
+
+const hub = createHub({ token: '<token>', onStart: (run, frame) => agent.start(run, frame) });
+const agent = createServerAgent({ hub, config, root: process.cwd() });
+```
+
+---
+
 ## The outside services
 
 `~/.ai-serve/config.json` holds the outside `ai-serve` instances:
@@ -333,7 +369,7 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 406 tests
+npm test          # 414 tests
 npm pack --dry-run
 ```
 

@@ -20,6 +20,7 @@ import { readMcpFile, registerService, removeService, registerMcpServer, removeM
 import { defaultHome, homeConfigFile, homeMcpFile, serveFile } from './config/paths.js';
 import { startServe, readServeRecord, pidAlive } from './server/serve.js';
 import { createHub } from './server/u2ai.js';
+import { createServerAgent } from './server/agent.js';
 import { createMcpServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { startStdioServer } from './server/stdio.js';
 import { createClient } from './openai/client.js';
@@ -129,12 +130,20 @@ async function commandServe(opts) {
     process.on('SIGTERM', stop);
 
     const token = randomBytes(32).toString('hex');
-    // The bus is alive; the agent behind it arrives with the roles of the plan.
+    // The bus is alive, and the agent behind it answers the runs of the clients. The
+    // agent needs the hub and the hub needs the agent: the link is closed here.
+    let agent = null;
     const hub = createHub({
         token,
-        onStart: async () => {
-            throw new Error('The agent of the server is not built yet.');
-        },
+        onStart: (run, frame) => (agent
+            ? agent.start(run, frame)
+            : Promise.reject(new Error('The agent of the server is not ready yet.'))),
+    });
+    agent = createServerAgent({
+        hub,
+        config,
+        root: cwd,
+        approve: config.server?.approve ?? 'ask',
     });
 
     // The bridge of the completion. The client of the API is made on the first request,

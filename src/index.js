@@ -121,6 +121,7 @@ export {
 export { HTTP_ROUTES, checkToken, requestToken, readJsonBody, createHttpHandler } from './server/http.js';
 export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServe } from './server/serve.js';
 export { createHub, attachConnection, attachCompletionSocket } from './server/u2ai.js';
+export { createServerAgent, AGENT_COMMANDS, AGENT_INSTRUCTIONS } from './server/agent.js';
 export {
     MCP_PROTOCOL_VERSION,
     MCP_SUPPORTED_PROTOCOLS,

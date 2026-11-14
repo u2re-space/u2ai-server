@@ -326,7 +326,60 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 
 ---
 
-## 3. Правила работы
+## 3. Совместимость с расширением VSCode и инструменты редактора (шаги A1–A9, B1–B2)
+
+> План целиком: `C:\Projects\Universal-AI\.koda\plans\ai-serve-compat.md`.
+> Расширение живёт в `C:\Projects\VSCodeExtension`. Один коммит на шаг, пуш не делаем.
+
+Зачем: пакет `@u2ai/server` — это сервер, а не только MCP. Расширение VSCode должно
+работать и с ним, и со старым монолитным `ai serve`; и только у расширения есть доступ
+к API редактора — значит, инструменты редактора должны быть доступны другим
+ИИ-системам.
+
+| Шаг | Где | Что сделано |
+|---|---|---|
+| A1 | пакет | Серверный агент `src/server/agent.js`: команды `ask`, `run`, `chat`, `image`; инструменты через хаб; события `text.delta`, `tool.exec.start/done`, `response.done` |
+| A2 | пакет | Контракт `serve.json`: `httpURL`, `complete`, `structure`, `completeWs`, `mcp`, `protocol` |
+| A3 | пакет | Протокол 0.4: кадр `tools.register`, `hub.listClientTools()`, `hub.callClientTool()` |
+| A4 | пакет | MCP-сервер публикует инструменты клиентов шины и вызывает их |
+| A5 | расширение | Адрес сервера: оба домашних каталога (`AI_SERVE_HOME`, `AI_AGENT_HOME`), новые поля `serve.json` |
+| A6 | расширение | Шина: захват инструментов для каждого нового прогона, регистрация своих инструментов |
+| A7 | расширение | Настройки и запуск: `ai-serve serve` и `ai serve`, модель из дефолтов сервера |
+| A8 | расширение | Tab-autocomplete: запасной путь через HTTP `/v1/complete` |
+| A9 | расширение | MCP-клиент к `/mcp` сервера: список инструментов и вызов |
+| B1 | расширение | stdio MCP-сервер расширения `src/agent/mcp.mjs` + команда `vext.agent.mcp` |
+| B2 | расширение | Режим прокси: инструменты редактора видны в MCP пакета (совместно с A3/A4/A6) |
+
+### step-A1 — Серверный агент
+- [x] `src/server/agent.js` — агент за шиной: команды `ask`, `run`, `chat`, `image`
+- [x] Инструменты модели идут через `hub.runTool`: клиент, который держит инструмент, выполняет его сам
+- [x] События прогона: `text.delta`, `reasoning.delta`, `tool.exec.start`, `tool.exec.done`, `text.done`, `response.done`, `warning`, `error`
+- [x] `src/cli.js` — `commandServe` больше не бросает «The agent of the server is not built yet.»
+- [x] `test/agent.test.js` — 8 тестов: ответ, инструменты, отказ картинок, падение модели, прогон через живой хаб
+- [x] `README.md` — раздел «The agent behind the bus»
+
+### step-A2 — Контракт `serve.json`
+- [ ] Поля `httpURL`, `complete`, `structure`, `completeWs`, `mcp`, `protocol` в записи сервера
+
+### step-A3 — Протокол 0.4
+- [ ] Кадр `tools.register`: клиент публикует свои инструменты
+- [ ] `hub.listClientTools()` и `hub.callClientTool()`
+
+### step-A4 — Инструменты клиентов в MCP
+- [ ] MCP-сервер пакета показывает инструменты клиентов шины и вызывает их
+
+### step-A5 … A9, B1, B2 — Расширение
+- [ ] Адрес сервера из двух домашних каталогов
+- [ ] Захват инструментов для каждого прогона, регистрация своих инструментов
+- [ ] Настройки запуска и модель
+- [ ] Запасной путь tab-autocomplete через HTTP
+- [ ] MCP-клиент к `/mcp`
+- [ ] stdio MCP-сервер расширения
+- [ ] Режим прокси
+
+---
+
+## 4. Правила работы
 
 1. Каждый шаг — отдельный коммит с сообщением `step-N: <что сделано>`; в этом же коммите
    галочки соответствующего шага в `planned.md` отмечаются.
