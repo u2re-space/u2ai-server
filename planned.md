@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 10 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер).
+> Актуальный статус: **шаг 11 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -221,12 +221,12 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/mcp.test.js` — 28 тестов: `initialize` → `tools/list` → `tools/call`, ресурсы, промпты, таймаут, отмена, оба транспорта
 
 ### step-11 — MCP-клиент
-- [ ] `src/client/mcp.js` — `initialize`, `tools/list`, `tools/call`; протоколы `2025-06-18`, `2025-03-26`, `2024-11-05`
-- [ ] `src/client/node.js` — stdio-транспорт, запуск процесса, таймауты
-- [ ] `src/client/http.js`, `src/client/fetch.js` — HTTP-транспорт MCP
-- [ ] `src/client/proxy.js` — нормализация описаний серверов, прокси-имена инструментов (`server__tool`)
-- [ ] `src/config/defaults.js` — список MCP-серверов по умолчанию
-- [ ] `test/mcp-client.test.js` — подъём локального stdio-сервера, обёртка имён
+- [x] `src/client/mcp.js` — `initialize`, `tools/list`, `tools/call`; протоколы `2025-06-18`, `2025-03-26`, `2024-11-05`
+- [x] `src/client/node.js` — stdio-транспорт, запуск процесса, таймауты
+- [x] `src/client/http.js`, `src/client/fetch.js` — HTTP-транспорт MCP
+- [x] `src/client/proxy.js` — нормализация описаний серверов, прокси-имена инструментов (`server__tool`)
+- [x] `src/config/defaults.js` — список MCP-серверов по умолчанию (`mcpServers`, формат записи)
+- [x] `test/mcp-client.test.js` — 16 тестов: подъём локального stdio-сервера, обёртка имён, серверы HTTP и битые серверы
 
 ### step-12 — Роли и серверный агент
 - [ ] `src/roles/analyzer.js` — разбор задачи и проекта

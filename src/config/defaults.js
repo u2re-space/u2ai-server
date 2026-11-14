@@ -150,6 +150,10 @@ export const defaults = {
    * External MCP servers we call as clients. Each entry is either
    * `{ name, url }` for an HTTP server or `{ name, command, args }` for a server
    * started over stdio. The list lives in ~/.ai-serve/mcp.json.
+   *
+   * Entry: { name, url?, token?, command?, args?, env?, cwd?, enabled?, timeoutMs? }.
+   * The proxy names the tools of a server `server__tool`, so two servers may have a tool
+   * with the same name. The list starts empty: the servers of the user are his own.
    */
   mcpServers: [],
 
@@ -219,6 +223,7 @@ export function defaultConfigText() {
       enabled: defaults.mcp.enabled,
       transport: defaults.mcp.transport,
     },
+    mcpServers: structuredClone(defaults.mcpServers),
   };
   return `${JSON.stringify(starter, null, 2)}\n`;
 }

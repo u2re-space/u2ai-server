@@ -188,3 +188,20 @@ export {
     collectRoleContext,
     formatRoleContext,
 } from './agent/context.js';
+export {
+    CLIENT_PROTOCOL_VERSIONS,
+    McpError,
+    createMcpClient,
+    toolText,
+} from './client/mcp.js';
+export { startNodeServer } from './client/node.js';
+export { createFetchTransport } from './client/fetch.js';
+export { createHttpTransport, mcpUrl } from './client/http.js';
+export {
+    normalizeServer,
+    proxyToolName,
+    splitProxyToolName,
+    proxyToolDefinition,
+    connectServer,
+    connectServers,
+} from './client/proxy.js';
