@@ -27,7 +27,7 @@
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { TOOL_SPECS, TOOL_NAMES, executeTool, describeTool } from '../tools/tools.js';
+import { TOOL_SPECS, TOOL_NAMES, executeTool, describeTool, toolAllowed } from '../tools/tools.js';
 import { scanWorkspace, formatWorkspace } from '../tools/context.js';
 import { checkToken, readJsonBody } from './http.js';
 
@@ -47,9 +47,6 @@ export const MCP_ERROR = Object.freeze({
     timeout: -32001,
     cancelled: -32800,
 });
-
-/** The tools that answer a call of the client. */
-const GROUP_FLAGS = Object.freeze({ fs: 'read', shell: 'terminal', workspace: 'workspace', suggest: 'suggest' });
 
 /** The resources the server publishes. */
 export const MCP_RESOURCES = Object.freeze([
@@ -143,16 +140,7 @@ export function createMcpServer({
      * @returns {boolean}
      * @ai.hint pure
      */
-    const allowed = (toolName) => {
-        const spec = TOOL_SPECS[toolName];
-        if (!spec) return false;
-        const flags = config?.tools ?? {};
-        const groupFlag = GROUP_FLAGS[spec.group];
-        if (groupFlag && flags[groupFlag] === false) return false;
-        if (spec.category === 'write' && flags.allowWrite === false) return false;
-        if (spec.category === 'exec' && flags.allowTerminal === false) return false;
-        return true;
-    };
+    const allowed = (toolName) => toolAllowed(toolName, config);
 
     /**
      * The tools the server shows: the ones the configuration allows.

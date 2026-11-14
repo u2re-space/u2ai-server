@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 11 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент).
+> Актуальный статус: **шаг 12 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -229,13 +229,16 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/mcp-client.test.js` — 16 тестов: подъём локального stdio-сервера, обёртка имён, серверы HTTP и битые серверы
 
 ### step-12 — Роли и серверный агент
-- [ ] `src/roles/analyzer.js` — разбор задачи и проекта
-- [ ] `src/roles/director.js` — план работ
-- [ ] `src/roles/executor.js` — исполнение шагов плана
-- [ ] `src/roles/tooler.js` — выбор и вызов инструментов
-- [ ] `src/roles/suggester.js` — ответы и подсказки по контексту
-- [ ] `src/roles/index.js` — цикл роли с инструментами, схема ответа, лимит ходов
-- [ ] `src/agent/callable.js` — «простые функции как ИИ-агент»: одношаговая задача без плана
+- [x] `src/roles/analyzer.js` — разбор задачи и проекта
+- [x] `src/roles/director.js` — план работ
+- [x] `src/roles/executor.js` — исполнение шагов плана
+- [x] `src/roles/tooler.js` — выбор и вызов инструментов
+- [x] `src/roles/suggester.js` — ответы и подсказки по контексту
+- [x] `src/roles/index.js` — цикл роли с инструментами, схема ответа, лимит ходов
+- [x] `src/agent/callable.js` — «простые функции как ИИ-агент»: одношаговая задача без плана
+- [x] `src/tools/tools.js` — `toolAllowed`: единая проверка прав инструмента для ролей и MCP
+- [x] `src/cli.js` — команда `agent`: агент целиком (`--role analyzer|director|executor|tooler|suggester`)
+- [x] `test/roles.test.js` — 22 теста: настройки роли, разбор задачи, план, выбор и вызов инструмента, шаги плана, лимит ходов, callable
 
 ### step-13 — Tab-autocomplete
 - [ ] `src/agent/autocomplete.js` — сбор окна документа (до 262144 байт; иначе строки `line-200…line+50`), деление окна при >900000 байт

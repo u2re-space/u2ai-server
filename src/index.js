@@ -157,6 +157,7 @@ export {
     toolCategory,
     toolRisk,
     toolsByCategory,
+    toolAllowed,
     executeTool,
 } from './tools/tools.js';
 export {
@@ -205,3 +206,28 @@ export {
     connectServer,
     connectServers,
 } from './client/proxy.js';
+
+export {
+    ROLE_NAMES,
+    ROLE_PROMPTS,
+    ROLE_TOOLS,
+    resolveRoleSettings,
+    roleToolNames,
+    createRoleAsk,
+    runRole,
+    runAgent,
+} from './roles/index.js';
+export { ANALYZER_SCHEMA, analyzerPrompt, shapeAnalysis, analyzeTask } from './roles/analyzer.js';
+export { DIRECTOR_SCHEMA, directorPrompt, shapePlan, planWork } from './roles/director.js';
+export { EXECUTOR_SCHEMA, executorPrompt, shapeStepReport, executePlan } from './roles/executor.js';
+export {
+    TOOLER_SCHEMA,
+    toolerPrompt,
+    parseToolArguments,
+    chooseTool,
+    callTool,
+    runTooler,
+    allowedToolNames,
+} from './roles/tooler.js';
+export { SUGGESTER_SCHEMA, suggesterPrompt, shapeSuggestion, suggestAnswer } from './roles/suggester.js';
+export { CALLABLE_INSTRUCTIONS, callablePrompt, runCallable } from './agent/callable.js';

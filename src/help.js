@@ -42,6 +42,7 @@ Commands:
 Options:
       --port <n>       The port to listen on (default: a free port).
       --cwd <dir>      The working directory of the task.
+      --role <name>    The role of the agent: analyzer, director, executor, tooler, suggester.
       --http           The MCP server speaks HTTP instead of stdio.
       --stdio          The MCP server speaks stdio (default).
   -c, --config <file>   The config file to use.

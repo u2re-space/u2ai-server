@@ -14,7 +14,7 @@
  * @depends agent/access, tools/filesystem, tools/terminal, tools/cache, shared/format
  * @usedBy agent/roles, server/mcp, server/http
  * @exports TOOL_SPECS, TOOL_NAMES, TOOL_CATEGORIES, TOOL_RISKS, toolDefinitions,
- *          describeTool, toolCategory, toolRisk, toolsByCategory, executeTool
+ *          describeTool, toolCategory, toolRisk, toolsByCategory, toolAllowed, executeTool
  * @ai.tags tools, catalog, schema
  * @ai.hint io
  */
@@ -332,6 +332,44 @@ export function toolRisk(name) {
  */
 export function toolsByCategory(category) {
     return TOOL_NAMES.filter((name) => TOOL_SPECS[name].category === category);
+}
+
+/**
+ * The flags of the configuration that carry the group of a tool.
+ *
+ * The group `fs` is covered by the flags of the categories it holds: `read` for the
+ * reading tools and `write` for the changing ones.
+ */
+const GROUP_FLAGS = Object.freeze({
+    fs: 'read',
+    shell: 'terminal',
+    workspace: 'workspace',
+    suggest: 'suggest',
+});
+
+/**
+ * Whether the configuration allows the tool.
+ *
+ * The flags of the configuration decide it: `tools.read`, `tools.write`,
+ * `tools.allowWrite`, `tools.allowTerminal` and the flags of the groups. A tool that is
+ * not allowed is not published and not called.
+ *
+ * @param {string} name
+ * @param {object|null} [config]
+ * @returns {boolean}
+ * @exports
+ * @ai.hint pure
+ */
+export function toolAllowed(name, config = null) {
+    const spec = TOOL_SPECS[name];
+    if (!spec) return false;
+    const flags = config?.tools ?? {};
+    const groupFlag = GROUP_FLAGS[spec.group];
+    if (groupFlag && flags[groupFlag] === false) return false;
+    if (spec.category === 'read' && flags.read === false) return false;
+    if (spec.category === 'write' && (flags.write === false || flags.allowWrite === false)) return false;
+    if (spec.category === 'exec' && (flags.terminal === false || flags.allowTerminal === false)) return false;
+    return true;
 }
 
 /**
