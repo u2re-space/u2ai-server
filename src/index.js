@@ -146,3 +146,14 @@ export {
     toolsByCategory,
     executeTool,
 } from './tools/tools.js';
+export {
+    SHELLS,
+    MAX_COMMAND_TIMEOUT_MS,
+    childEnvironment,
+    scriptLaunch,
+    runCommand,
+    runProgram,
+} from './tools/terminal.js';
+export { assessCommandRisk, rewriteCommandText, guardCommandInput } from './tools/command-risk.js';
+export { createToolCache } from './tools/cache.js';
+export { FILE_COMMANDS_SCHEMA, CommandBatchError, executeFileCommands } from './tools/file-commands.js';

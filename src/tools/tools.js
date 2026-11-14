@@ -11,7 +11,7 @@
  *   The category decides the approval: `read` is usually free, `write` asks, `exec` asks
  *   more. The risk says how much the tool may break when it goes wrong.
  *
- * @depends agent/access, tools/filesystem, shared/format
+ * @depends agent/access, tools/filesystem, tools/terminal, tools/cache, shared/format
  * @usedBy agent/roles, server/mcp, server/http
  * @exports TOOL_SPECS, TOOL_NAMES, TOOL_CATEGORIES, TOOL_RISKS, toolDefinitions,
  *          describeTool, toolCategory, toolRisk, toolsByCategory, executeTool
@@ -29,6 +29,8 @@ import {
     makeDirectory,
     copyPath,
 } from './filesystem.js';
+import { runCommand, runProgram, scriptLaunch, SHELLS } from './terminal.js';
+import { resolveInside } from '../agent/access.js';
 
 /** The categories of the tools: they drive the approval. */
 export const TOOL_CATEGORIES = Object.freeze(['read', 'write', 'exec']);
@@ -93,8 +95,16 @@ function fitsType(field, value) {
     const types = Array.isArray(field.type) ? field.type : [field.type];
     if (value === null) return types.includes('null');
     const actual = typeof value;
-    if (actual === 'number') return types.includes('integer') || types.includes('number');
-    return types.includes(actual);
+    if (actual === 'number') {
+        if (!types.includes('integer') && !types.includes('number')) return false;
+        if (types.includes('integer') && !Number.isInteger(value)) return false;
+    } else if (actual === 'object') {
+        if (!types.includes('array') || !Array.isArray(value)) return false;
+    } else if (!types.includes(actual)) {
+        return false;
+    }
+    if (Array.isArray(field.enum) && !field.enum.includes(value)) return false;
+    return true;
 }
 
 /**
@@ -188,6 +198,31 @@ export const TOOL_SPECS = Object.freeze({
             destination: str('The path of the destination, relative to the working directory.'),
         }),
     },
+    run_command: {
+        category: 'exec',
+        group: 'shell',
+        risk: 'high',
+        description: 'Run one command in the working directory and return the exit code with the captured stdout and stderr. The shell may be powershell, pwsh, cmd, bash, sh or zsh; an empty shell uses the platform default. The command is non-interactive, the output is capped, and the command must exit: do not use it for a dev server.',
+        parameters: schema({
+            command: str('The command line to execute.'),
+            shell: { type: 'string', enum: [...SHELLS], description: 'The interpreter: powershell, pwsh, cmd, bash, sh, zsh. Empty = the platform default.' },
+            cwd: nullableStr('The subdirectory to run in, relative to the working directory. Null = the working directory.'),
+            timeout_seconds: nullableInt('The time limit in seconds (max 900). Null = the configured default.'),
+        }, ['shell', 'cwd', 'timeout_seconds']),
+    },
+    run_script: {
+        category: 'exec',
+        group: 'shell',
+        risk: 'high',
+        description: 'Run a script file inside the working directory. A .ps1 file uses PowerShell, a .cmd or .bat file uses cmd, a .sh or .bash file uses bash. The shell may override the extension. The arguments are argv, not a shell string.',
+        parameters: schema({
+            path: str('The path of the script, relative to the working directory.'),
+            args: { type: 'array', items: { type: 'string' }, description: 'The arguments of the script.' },
+            shell: { type: 'string', enum: [...SHELLS], description: 'The interpreter that overrides the extension. Empty = the interpreter of the extension.' },
+            cwd: nullableStr('The subdirectory to run in, relative to the working directory. Null = the working directory.'),
+            timeout_seconds: nullableInt('The time limit in seconds (max 900). Null = the configured default.'),
+        }, ['args', 'shell', 'cwd', 'timeout_seconds']),
+    },
 });
 
 /** The names of the tools of the package. */
@@ -268,6 +303,45 @@ export function toolsByCategory(category) {
 }
 
 /**
+ * The answer of a command: the exit code, the output, and the flags of the run.
+ * @param {object} out
+ * @returns {string}
+ * @ai.hint pure
+ */
+function commandText(out) {
+    return [
+        `exit: ${out.exitCode ?? 'null'}${out.timedOut ? ' (the time is up)' : ''}${out.cancelled ? ' (cancelled)' : ''}`,
+        out.stdout ? `stdout:\n${out.stdout}` : '',
+        out.stderr ? `stderr:\n${out.stderr}` : '',
+        out.truncated ? 'the output is cut.' : '',
+    ].filter((part) => part).join('\n');
+}
+
+/**
+ * Run a script file of the root and answer with the exit code and the output.
+ *
+ * The path of the script goes through `agent/access`, so the script is always inside the
+ * root of the run.
+ * @param {{ root: string, path: string, args?: string[], shell?: string|null, cwd?: string|null,
+ *           timeoutMs?: number, maxOutputBytes?: number, signal?: AbortSignal }} options
+ * @returns {Promise<{ text: string, data: object }>}
+ * @ai.hint io
+ */
+async function runScript({ root, path: file, args = [], shell = null, cwd = null, timeoutMs, maxOutputBytes, signal }) {
+    const inside = await resolveInside(root, file, { allowRoot: false });
+    const launch = scriptLaunch(inside.abs, { shell, args });
+    const out = await runProgram({
+        ...launch,
+        cwd: cwd ?? null,
+        root,
+        timeoutMs,
+        maxOutputBytes,
+        signal,
+    });
+    return { text: commandText(out), data: { ...out, path: inside.rel } };
+}
+
+/**
  * Run a tool of the catalog by its name.
  *
  * The arguments come from the model, so they are checked against the schema of the tool
@@ -275,12 +349,12 @@ export function toolsByCategory(category) {
  * of the wrong type is a refusal, not a half-done change.
  * @param {string} name
  * @param {object} args
- * @param {{ root: string, config?: object|null }} context
+ * @param {{ root: string, config?: object|null, signal?: AbortSignal }} context
  * @returns {Promise<{ text: string, data?: object }>}
  * @exports
  * @ai.hint io
  */
-export async function executeTool(name, args = {}, { root, config = null } = {}) {
+export async function executeTool(name, args = {}, { root, config = null, signal } = {}) {
     const spec = TOOL_SPECS[name];
     if (!spec) throw new Error(`There is no tool named ${name}.`);
     if (!root) throw new Error('The root of the tools is not set.');
@@ -344,6 +418,25 @@ export async function executeTool(name, args = {}, { root, config = null } = {})
         delete_file: () => deleteFile({ root, file: params.path, backupDir }),
         make_directory: () => makeDirectory({ root, dir: params.path }),
         copy_path: () => copyPath({ root, source: params.source, destination: params.destination }),
+        run_command: () => runCommand({
+            command: params.command,
+            shell: params.shell || null,
+            cwd: params.cwd ?? null,
+            root,
+            timeoutMs: params.timeout_seconds ? params.timeout_seconds * 1000 : (limits.commandTimeoutMs ?? 180_000),
+            maxOutputBytes: limits.maxOutputBytes ?? 64 * 1024,
+            signal,
+        }).then((out) => ({ text: commandText(out), data: out })),
+        run_script: () => runScript({
+            root,
+            path: params.path,
+            args: params.args ?? [],
+            shell: params.shell || null,
+            cwd: params.cwd ?? null,
+            timeoutMs: params.timeout_seconds ? params.timeout_seconds * 1000 : (limits.commandTimeoutMs ?? 180_000),
+            maxOutputBytes: limits.maxOutputBytes ?? 64 * 1024,
+            signal,
+        }),
     }[name]();
 
     if (result && typeof result.text === 'string') return { text: result.text, data: result };

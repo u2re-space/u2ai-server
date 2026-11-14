@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 7 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы).
+> Актуальный статус: **шаг 8 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -197,10 +197,12 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/filesystem.test.js` — 47 тестов: корень доступа, секреты, список, чтение, поиск, запись, замена, удаление, копирование, схемы
 
 ### step-8 — Терминал и команды
-- [ ] `src/tools/terminal.js` — `runCommand`, `runProgram`, оболочки (`powershell`, `pwsh`, `cmd`, `bash`, `sh`, `zsh`), таймауты, лимит вывода
-- [ ] `src/tools/tools.js` — пакетные команды файлов (`FILE_COMMANDS_SCHEMA`), оценка риска (`command-risk.js` из монолита)
-- [ ] `src/tools/cache.js` — кэш результатов инструментов в рамках прогона
-- [ ] `test/terminal.test.js` — запуск, таймаут, усечение вывода, категория approve
+- [x] `src/tools/terminal.js` — `runCommand`, `runProgram`, оболочки (`powershell`, `pwsh`, `cmd`, `bash`, `sh`, `zsh`), таймауты, лимит вывода
+- [x] `src/tools/command-risk.js` — оценка риска текста команды, переписывание опасных формулировок
+- [x] `src/tools/file-commands.js` — `FILE_COMMANDS_SCHEMA`, пакет `fs:read` / `fs:write` / `fs:list`
+- [x] `src/tools/cache.js` — кэш результатов инструментов в рамках прогона
+- [x] `src/tools/tools.js` — каталог: `run_command`, `run_script`, категория `exec`, риск `high`
+- [x] `test/terminal.test.js` — 30 тестов: запуск, таймаут, усечение вывода, отмена, секреты окружения, риск, пакет, кэш
 
 ### step-9 — Контекст и сканирование workspace
 - [ ] `src/tools/context.js` — карта workspace, `parseJsonc`, html-entry, формат карточки

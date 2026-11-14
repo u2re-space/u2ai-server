@@ -301,11 +301,12 @@ test('the copy refuses a tree with a secret', async () => {
   );
 });
 
-test('the catalog holds the eight tools of the file system', () => {
-  assert.equal(TOOL_NAMES.length, 8);
+test('the catalog holds the file system tools and the terminal ones', () => {
+  assert.equal(TOOL_NAMES.length, 10);
   for (const name of TOOL_NAMES) assert.ok(TOOL_SPECS[name], name);
   assert.equal(toolCategory('write_file'), 'write');
   assert.equal(toolCategory('read_file'), 'read');
+  assert.equal(toolCategory('run_command'), 'exec');
   assert.equal(toolRisk('delete_file'), 'high');
   assert.equal(toolCategory('nope'), null);
   assert.equal(describeTool('nope'), null);
@@ -315,7 +316,7 @@ test('the catalog holds the eight tools of the file system', () => {
 
 test('the definitions of the tools are ready for the request', () => {
   const defs = toolDefinitions();
-  assert.equal(defs.length, 8);
+  assert.equal(defs.length, 10);
   for (const def of defs) {
     assert.equal(def.type, 'function');
     assert.ok(def.name);
