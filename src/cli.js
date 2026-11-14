@@ -10,10 +10,12 @@
 
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
 import { loadConfig, redactConfig } from './config.js';
 import { startServe } from './server/serve.js';
+import { createHub } from './server/u2ai.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
 const require = createRequire(import.meta.url);
@@ -115,6 +117,15 @@ async function commandServe(opts) {
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
 
+    const token = randomBytes(32).toString('hex');
+    // The bus is alive; the agent behind it arrives with the roles of the plan.
+    const hub = createHub({
+        token,
+        onStart: async () => {
+            throw new Error('The agent of the server is not built yet.');
+        },
+    });
+
     let handle;
     try {
         handle = await startServe({
@@ -122,6 +133,8 @@ async function commandServe(opts) {
             config,
             port,
             host: config.server?.host ?? '127.0.0.1',
+            token,
+            hub,
         });
     } catch (error) {
         process.off('SIGINT', stop);
@@ -140,6 +153,7 @@ async function commandServe(opts) {
         else controller.signal.addEventListener('abort', resolve, { once: true });
     });
 
+    hub.shutdown();
     await handle.close();
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);

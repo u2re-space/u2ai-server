@@ -69,3 +69,46 @@ export {
     contextBytes,
     maxOutputFor,
 } from './model/profiles.js';
+
+export {
+    PROTOCOL_VERSION,
+    MAX_FRAME_BYTES,
+    MAX_COMPLETION_CONTEXT_BYTES,
+    MAX_COMPLETION_FRAME_BYTES,
+    COMPLETION_WINDOWS,
+    COMMANDS,
+    APPROVE_MODES,
+    DECISIONS,
+    START_FIELDS,
+    REJECTED_START_FIELDS,
+    FRAME_TYPES,
+    EVENT_TYPES,
+    PROCESSABLE_TOOLS,
+    END_STATUSES,
+    ROLES,
+    completionWindowLines,
+} from './shared/protocol.js';
+export {
+    sanitizeValue,
+    encodeFrame,
+    errorFrame,
+    readyFrame,
+    runStartedFrame,
+    runEndedFrame,
+    runEventFrame,
+    completionFrame,
+    buildCompletionFrame,
+} from './shared/encoder.js';
+export { decodeFrame, validateFrame, validateStart, validateComplete } from './shared/decoder.js';
+
+export {
+    WS_GUID,
+    CLOSE,
+    WsConnection,
+    acceptKey,
+    encodeWsFrame,
+    listenWebSocket,
+} from './server/ws.js';
+export { HTTP_ROUTES, checkToken, requestToken, readJsonBody, createHttpHandler } from './server/http.js';
+export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServe } from './server/serve.js';
+export { createHub, attachConnection } from './server/u2ai.js';

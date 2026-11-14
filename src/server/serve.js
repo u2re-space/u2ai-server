@@ -24,6 +24,7 @@ import path from 'node:path';
 import { serveFile } from '../config/paths.js';
 import { listenWebSocket } from './ws.js';
 import { createHttpHandler } from './http.js';
+import { attachConnection } from './u2ai.js';
 import { PROTOCOL_VERSION, MAX_FRAME_BYTES } from '../shared/protocol.js';
 
 /** The mode of the file with the token: only the owner may read it. */
@@ -107,9 +108,9 @@ function notReadyConnection(connection) {
  * Start the server: the bus, the HTTP part and the file with the address.
  *
  * @param {{ home: string, config?: object|null, port?: number, host?: string, token?: string,
- *           onConnection?: Function|null, onRequest?: Function|null, onUpgrade?: Function|null,
- *           onComplete?: Function|null, onStructure?: Function|null, tools?: object[]|Function,
- *           writeFile?: boolean, file?: string|null }} [options]
+ *           onConnection?: Function|null, hub?: object|null, onRequest?: Function|null,
+ *           onUpgrade?: Function|null, onComplete?: Function|null, onStructure?: Function|null,
+ *           tools?: object[]|Function, writeFile?: boolean, file?: string|null }} [options]
  * @returns {Promise<{ url: string, httpURL: string, port: number, token: string, file: string|null,
  *           record: object, close: () => Promise<void> }>}
  * @exports
@@ -122,6 +123,7 @@ export async function startServe({
     host = '127.0.0.1',
     token = randomBytes(32).toString('hex'),
     onConnection = null,
+    hub = null,
     onRequest = null,
     onUpgrade = null,
     onComplete = null,
@@ -156,7 +158,7 @@ export async function startServe({
         listener = await listenWebSocket({
             port,
             host,
-            onConnection: onConnection ?? notReadyConnection,
+            onConnection: onConnection ?? (hub ? (connection) => attachConnection(hub, connection) : notReadyConnection),
             onRequest: http,
             onUpgrade,
             pingIntervalMs: config?.server?.pingIntervalMs ?? 30_000,

@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 5 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер).
+> Актуальный статус: **шаг 6 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -183,10 +183,11 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/serve.test.js` — 19 тестов: рукопожатие, `serve.json`, занятый порт, живой `pid`, `/health`, токен
 
 ### step-6 — Хаб шины
-- [ ] `src/server/u2ai.js` — запуск прогона, подписки на события, `run.started`/`run.ended`, `run.event`
-- [ ] `src/server/u2ai.js` — approve/question: `approval.request`, `question.request`, ожидание решения
-- [ ] `src/server/u2ai.js` — `waitInput` для продолжения чата
-- [ ] `test/hub.test.js` — жизненный цикл прогона, approve, вопрос
+- [x] `src/server/u2ai.js` — запуск прогона, подписки на события, `run.started`/`run.ended`, `run.event`
+- [x] `src/server/u2ai.js` — approve/question: `approval.request`, `question.request`, ожидание решения
+- [x] `src/server/u2ai.js` — `waitInput` для продолжения чата
+- [x] `src/server/u2ai.js` — `attachConnection`: разбор кадров клиента, `subscribe`/`unsubscribe`, `cancel`, `ping`
+- [x] `test/hub.test.js` — 21 тест: жизненный цикл прогона, approve, вопрос, ввод, отмена, подписки
 
 ### step-7 — Инструменты файловой системы
 - [ ] `src/agent/access.js` — корень доступа, пути внутри корня, запрет секретов
