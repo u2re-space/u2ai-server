@@ -4,7 +4,7 @@
  * @purpose Small formatters the tools and the answers share.
  * @depends nothing
  * @usedBy tools/filesystem, tools/terminal, tools/context, agent/roles
- * @exports formatBytes, formatDuration, truncateText
+ * @exports formatBytes, formatDuration, truncateText, clipMiddle
  * @ai.tags format
  * @ai.hint pure
  */
@@ -64,4 +64,22 @@ export function truncateText(text, maxBytes) {
     let end = maxBytes;
     while (end > 0 && (buffer[end] & 0xc0) === 0x80) end -= 1;
     return { text: buffer.subarray(0, end).toString('utf8'), truncated: true };
+}
+
+/**
+ * Keep the head and the tail of a long text and cut the middle. Operates on UTF-8 bytes.
+ * @param {string} text
+ * @param {number} maxBytes
+ * @returns {string}
+ * @exports
+ * @ai.hint pure
+ */
+export function clipMiddle(text, maxBytes) {
+    const data = Buffer.from(String(text ?? ''), 'utf8');
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) return data.toString('utf8');
+    if (data.length <= maxBytes) return data.toString('utf8');
+    const half = Math.floor(maxBytes / 2);
+    const head = data.subarray(0, half).toString('utf8').replace(/\uFFFD+$/, '');
+    const tail = data.subarray(data.length - half).toString('utf8').replace(/^\uFFFD+/, '');
+    return `${head}\n…[skipped ${formatBytes(data.length - 2 * half)}]…\n${tail}`;
 }

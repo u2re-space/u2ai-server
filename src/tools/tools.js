@@ -31,6 +31,9 @@ import {
 } from './filesystem.js';
 import { runCommand, runProgram, scriptLaunch, SHELLS } from './terminal.js';
 import { resolveInside } from '../agent/access.js';
+import { scanWorkspace, formatWorkspace } from './context.js';
+import { collectRoleContext } from '../agent/context.js';
+import { suggest } from './suggest.js';
 
 /** The categories of the tools: they drive the approval. */
 export const TOOL_CATEGORIES = Object.freeze(['read', 'write', 'exec']);
@@ -222,6 +225,35 @@ export const TOOL_SPECS = Object.freeze({
             cwd: nullableStr('The subdirectory to run in, relative to the working directory. Null = the working directory.'),
             timeout_seconds: nullableInt('The time limit in seconds (max 900). Null = the configured default.'),
         }, ['args', 'shell', 'cwd', 'timeout_seconds']),
+    },
+    scan_workspace: {
+        category: 'read',
+        group: 'workspace',
+        risk: 'low',
+        description: 'Read the workspace of the working directory: package.json, tsconfig or jsconfig, the import maps, and the root index.html. The answer names the kind of the project, the aliases of the imports, the entry points, and the files the task mentions.',
+        parameters: schema({
+            task: str('The task of the role. The files it mentions are the files to read or to edit.'),
+        }, ['task']),
+    },
+    collect_context: {
+        category: 'read',
+        group: 'workspace',
+        risk: 'low',
+        description: 'Collect the context of a role: the card of the workspace, the AGENTS.md files of the project, and the files the task mentions as @path or @path#10-40.',
+        parameters: schema({
+            task: str('The task of the role.'),
+            role: str('The name of the role. The default is agent.'),
+        }, ['task', 'role']),
+    },
+    suggest: {
+        category: 'read',
+        group: 'suggest',
+        risk: 'low',
+        description: 'Suggest the paths and the commands that fit the context: the paths of the tree that carry the prefix, and the scripts of package.json.',
+        parameters: schema({
+            prefix: str('The text the paths carry. Empty = the first paths of the tree.'),
+            kind: { type: 'string', enum: ['path', 'command', 'all'], description: 'What to suggest. The default is all.' },
+        }, ['prefix', 'kind']),
     },
 });
 
@@ -437,6 +469,31 @@ export async function executeTool(name, args = {}, { root, config = null, signal
             maxOutputBytes: limits.maxOutputBytes ?? 64 * 1024,
             signal,
         }),
+        scan_workspace: async () => {
+            const card = await scanWorkspace(root, { task: params.task ?? '' });
+            return { text: formatWorkspace(card), data: card };
+        },
+        collect_context: async () => {
+            const context = await collectRoleContext({
+                root,
+                task: params.task ?? '',
+                role: params.role ?? 'agent',
+                home: config?.home ?? null,
+            });
+            return { text: context.text, data: context };
+        },
+        suggest: async () => {
+            const out = await suggest({
+                root,
+                prefix: params.prefix ?? '',
+                kind: params.kind ?? 'all',
+            });
+            const lines = [
+                ...out.paths.map((item) => `- ${item}`),
+                ...out.commands.map((item) => `- ${item}`),
+            ];
+            return { text: lines.join('\n') || '- (none)', data: out };
+        },
     }[name]();
 
     if (result && typeof result.text === 'string') return { text: result.text, data: result };

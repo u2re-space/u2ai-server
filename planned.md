@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 8 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал).
+> Актуальный статус: **шаг 9 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -205,10 +205,11 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/terminal.test.js` — 30 тестов: запуск, таймаут, усечение вывода, отмена, секреты окружения, риск, пакет, кэш
 
 ### step-9 — Контекст и сканирование workspace
-- [ ] `src/tools/context.js` — карта workspace, `parseJsonc`, html-entry, формат карточки
-- [ ] `src/agent/context.js` — сбор контекста для роли: файлы, `AGENTS.md`, упоминания `@file`
-- [ ] `src/tools/suggest.js` — подсказки путей и команд по контексту
-- [ ] `test/context.test.js` — карта проекта, разбор jsonc, html-entry
+- [x] `src/tools/context.js` — карта workspace, `parseJsonc`, html-entry, формат карточки
+- [x] `src/agent/context.js` — сбор контекста для роли: файлы, `AGENTS.md`, упоминания `@file`
+- [x] `src/tools/suggest.js` — подсказки путей и команд по контексту
+- [x] `src/tools/tools.js` — каталог: `scan_workspace`, `collect_context`, `suggest` (группа `workspace` / `suggest`)
+- [x] `test/context.test.js` — 33 теста: карта проекта, разбор jsonc, html-entry, упоминания, `AGENTS.md`, подсказки
 
 ### step-10 — MCP-сервер (приоритет v0.3)
 - [ ] `src/server/mcp.js` — JSON-RPC 2.0 без SDK: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`

@@ -157,3 +157,21 @@ export {
 export { assessCommandRisk, rewriteCommandText, guardCommandInput } from './tools/command-risk.js';
 export { createToolCache } from './tools/cache.js';
 export { FILE_COMMANDS_SCHEMA, CommandBatchError, executeFileCommands } from './tools/file-commands.js';
+export {
+    INDEX_HTML_INLINE_BYTES,
+    parseJsonc,
+    extractHtmlEntries,
+    resolveSpecifier,
+    mergeTaskDraft,
+    formatWorkspace,
+    scanWorkspace,
+} from './tools/context.js';
+export { suggestPaths, suggestCommands, suggest } from './tools/suggest.js';
+export {
+    AGENT_FILE_NAMES,
+    parseMention,
+    collectMentions,
+    discoverAgents,
+    collectRoleContext,
+    formatRoleContext,
+} from './agent/context.js';
