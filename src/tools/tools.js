@@ -13,8 +13,9 @@
  *
  * @depends agent/access, tools/filesystem, tools/terminal, tools/cache, shared/format
  * @usedBy agent/roles, server/mcp, server/http
- * @exports TOOL_SPECS, TOOL_NAMES, TOOL_CATEGORIES, TOOL_RISKS, toolDefinitions,
- *          describeTool, toolCategory, toolRisk, toolsByCategory, toolAllowed, executeTool
+ * @exports TOOL_SPECS, TOOL_NAMES, TOOL_CATEGORIES, TOOL_RISKS, TOOL_ALIASES, toolDefinitions,
+ *          describeTool, toolCategory, toolRisk, toolsByCategory, toolAllowed, resolveToolName,
+ *          needsApproval, executeToolRequest, executeTool
  * @ai.tags tools, catalog, schema
  * @ai.hint io
  */
@@ -259,6 +260,155 @@ export const TOOL_SPECS = Object.freeze({
 
 /** The names of the tools of the package. */
 export const TOOL_NAMES = Object.freeze(Object.keys(TOOL_SPECS));
+
+/**
+ * The names of the monolith of the version 0.2 and the names of the catalog.
+ *
+ * The extension of the old version holds `replace_text`; the tool of the package is
+ * `replace_in_file`. The bus speaks the old names, the catalog keeps its own.
+ */
+export const TOOL_ALIASES = Object.freeze({ replace_text: 'replace_in_file' });
+
+/**
+ * The name of a tool of the catalog: the old name goes to the new one.
+ * @param {string} name
+ * @returns {string}
+ * @exports
+ * @ai.hint pure
+ */
+export function resolveToolName(name) {
+    const key = String(name ?? '').trim();
+    return TOOL_ALIASES[key] ?? key;
+}
+
+/**
+ * Whether the tool needs the permission of the user.
+ *
+ * The mode of the run decides: `ask` asks for every category, `read` lets the reading
+ * tools go, `write` lets the reading and the writing tools go, and `all` lets everything
+ * go. A tool that does not exist always needs the permission: it is refused anyway.
+ *
+ * @param {string} name
+ * @param {string} [mode] one of `ask`, `read`, `write`, `all`
+ * @returns {boolean}
+ * @exports
+ * @ai.hint pure
+ */
+export function needsApproval(name, mode = 'ask') {
+    const spec = TOOL_SPECS[resolveToolName(name)];
+    if (!spec) return true;
+    const level = { read: 0, write: 1, exec: 2 }[spec.category] ?? 2;
+    const free = { ask: -1, read: 0, write: 1, all: 2 }[mode] ?? -1;
+    return level > free;
+}
+
+/**
+ * One line about what the tool did.
+ * @param {string} name
+ * @param {object|null} data the answer of the tool
+ * @param {object} [args] the arguments of the tool
+ * @returns {string}
+ * @ai.hint pure
+ */
+function toolSummary(name, data, args = {}) {
+    const rel = typeof data?.rel === 'string' ? data.rel : (typeof args.path === 'string' ? args.path : null);
+    switch (name) {
+        case 'read_file': return rel ? `read ${rel}` : 'read the file';
+        case 'list_files': return rel ? `listed ${rel}` : 'listed the files';
+        case 'search_files': return `searched for ${args.query ?? ''}`.trim();
+        case 'write_file': return rel ? `${data?.created ? 'created' : 'wrote'} ${rel}` : 'wrote the file';
+        case 'replace_in_file': return rel ? `edited ${rel}` : 'edited the file';
+        case 'delete_file': return rel ? `deleted ${rel}` : 'deleted the file';
+        case 'make_directory': return rel ? `created the directory ${rel}` : 'created the directory';
+        case 'copy_path': return `copied ${data?.source ?? ''} to ${data?.destination ?? ''}`.trim();
+        case 'run_command': return `ran ${data?.command ?? 'the command'}`;
+        case 'run_script': return `ran ${data?.path ?? 'the script'}`;
+        default: return `ran ${name}`;
+    }
+}
+
+/**
+ * The files that the tool touched.
+ * @param {string} name
+ * @param {object|null} data the answer of the tool
+ * @returns {Array<{ op: string, path: string }>}
+ * @ai.hint pure
+ */
+function toolChanges(name, data) {
+    const rel = typeof data?.rel === 'string' ? data.rel : null;
+    switch (name) {
+        case 'write_file':
+            return rel ? [{ op: data?.created ? 'create' : 'overwrite', path: rel }] : [];
+        case 'replace_in_file':
+            return rel ? [{ op: 'edit', path: rel }] : [];
+        case 'delete_file':
+            return rel ? [{ op: 'delete', path: rel }] : [];
+        case 'make_directory':
+            return rel ? [{ op: 'create', path: rel }] : [];
+        case 'copy_path':
+            return typeof data?.destination === 'string' ? [{ op: 'create', path: data.destination }] : [];
+        default:
+            return [];
+    }
+}
+
+/**
+ * Run a tool of the catalog as a request of the bus.
+ *
+ * The answer has the shape of the `tool.result` frame: the text of the tool, one line
+ * about it and the files it touched. A failure is an answer too: the bus needs a result,
+ * not an exception.
+ *
+ * @param {string} name
+ * @param {object} [args]
+ * @param {{ root: string, config?: object|null, signal?: AbortSignal|null, approve?: string,
+ *           approveFn?: Function|null }} [context]
+ * @returns {Promise<{ ok: boolean, output: string, summary: string,
+ *           changes: Array<{ op: string, path: string }>, error: string|null, approval?: string }>}
+ * @exports
+ * @ai.hint io
+ */
+export async function executeToolRequest(name, args = {}, {
+    root,
+    config = null,
+    signal = null,
+    approve = 'ask',
+    approveFn = null,
+} = {}) {
+    const tool = resolveToolName(name);
+    const fail = (error, approval = null) => ({
+        ok: false,
+        output: '',
+        summary: '',
+        changes: [],
+        error,
+        ...(approval ? { approval } : {}),
+    });
+    if (!TOOL_SPECS[tool]) return fail(`There is no tool named ${name}.`);
+    if (!toolAllowed(tool, config)) return fail(`The configuration does not allow the tool ${tool}.`);
+    if (!root) return fail('The root of the tools is not set.');
+
+    if (needsApproval(tool, approve)) {
+        const category = TOOL_SPECS[tool].category;
+        const allowed = typeof approveFn === 'function'
+            ? await approveFn({ name: tool, category, args })
+            : false;
+        if (!allowed) return fail(`The tool ${tool} was not allowed.`, 'required');
+    }
+
+    try {
+        const out = await executeTool(tool, args, { root, config, signal });
+        return {
+            ok: true,
+            output: typeof out?.text === 'string' ? out.text : '',
+            summary: toolSummary(tool, out?.data ?? null, args ?? {}),
+            changes: toolChanges(tool, out?.data ?? null),
+            error: null,
+        };
+    } catch (error) {
+        return fail(error?.message ?? String(error));
+    }
+}
 
 /**
  * The catalog as the tools of a request: the shape the Responses API expects.

@@ -75,6 +75,7 @@ export {
     MAX_FRAME_BYTES,
     MAX_COMPLETION_CONTEXT_BYTES,
     MAX_COMPLETION_FRAME_BYTES,
+    TOOL_REQUEST_TIMEOUT_MS,
     COMPLETION_WINDOWS,
     COMMANDS,
     APPROVE_MODES,
@@ -99,7 +100,14 @@ export {
     completionFrame,
     buildCompletionFrame,
 } from './shared/encoder.js';
-export { decodeFrame, validateFrame, validateStart, validateComplete } from './shared/decoder.js';
+export {
+    decodeFrame,
+    validateFrame,
+    validateStart,
+    validateComplete,
+    validateClaim,
+    validateToolResult,
+} from './shared/decoder.js';
 
 export {
     WS_GUID,
@@ -152,12 +160,16 @@ export {
     TOOL_NAMES,
     TOOL_CATEGORIES,
     TOOL_RISKS,
+    TOOL_ALIASES,
     toolDefinitions,
     describeTool,
     toolCategory,
     toolRisk,
     toolsByCategory,
     toolAllowed,
+    resolveToolName,
+    needsApproval,
+    executeToolRequest,
     executeTool,
 } from './tools/tools.js';
 export {

@@ -9,7 +9,8 @@
  *
  * @depends shared/protocol
  * @usedBy server/ws, server/u2ai, server/http
- * @exports decodeFrame, validateFrame, validateStart, validateComplete
+ * @exports decodeFrame, validateFrame, validateStart, validateComplete, validateClaim,
+ *          validateToolResult
  * @ai.tags protocol, decoder
  * @ai.hint pure
  */
@@ -28,6 +29,9 @@ import {
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const textOf = (value) => (typeof value === 'string' ? value : '');
+
+/** The kinds of a change of a file. */
+const CHANGE_OPS = Object.freeze(['create', 'overwrite', 'edit', 'delete']);
 
 /**
  * A failed check.
@@ -107,6 +111,10 @@ export function validateFrame(frame) {
         }
         case 'complete':
             return validateComplete(frame);
+        case 'processing.claim':
+            return validateClaim(frame);
+        case 'tool.result':
+            return validateToolResult(frame);
         case 'cancel': {
             if (!textOf(frame.runId).trim()) return fail('bad_request', 'The cancel frame needs a runId.');
             return { ok: true, frame };
@@ -169,6 +177,66 @@ export function validateStart(frame) {
             }
             if (seen.has(name)) return fail('invalid_start', `The name of the tool repeats: ${name}.`);
             seen.add(name);
+        }
+    }
+    return { ok: true, frame };
+}
+
+/**
+ * Check the fields of a `processing.claim` frame.
+ *
+ * The list of the tools is closed: a client may hold only the tools of the protocol, and
+ * a name may not repeat.
+ *
+ * @param {object} frame
+ * @returns {{ ok: true, frame: object } | { ok: false, code: string, message: string }}
+ * @exports
+ * @ai.hint pure
+ */
+export function validateClaim(frame) {
+    if (!textOf(frame.runId).trim()) return fail('bad_request', 'The processing.claim frame needs a runId.');
+    if (!Array.isArray(frame.tools)) return fail('bad_request', 'The tools must be a list of tool names.');
+    const seen = new Set();
+    for (const name of frame.tools) {
+        if (typeof name !== 'string' || !PROCESSABLE_TOOLS.includes(name)) {
+            return fail('bad_request', `The tool is not available for the capture: ${String(name)}.`);
+        }
+        if (seen.has(name)) return fail('bad_request', `The name of the tool repeats: ${name}.`);
+        seen.add(name);
+    }
+    return { ok: true, frame };
+}
+
+/**
+ * Check the fields of a `tool.result` frame.
+ *
+ * The answer of a holder is either an error or a text: `output` is what the tool printed,
+ * `summary` is one line about it, and `changes` are the files it touched.
+ *
+ * @param {object} frame
+ * @returns {{ ok: true, frame: object } | { ok: false, code: string, message: string }}
+ * @exports
+ * @ai.hint pure
+ */
+export function validateToolResult(frame) {
+    if (!textOf(frame.requestId).trim()) return fail('bad_request', 'The tool.result frame needs a requestId.');
+    if (frame.error !== undefined && typeof frame.error !== 'string') {
+        return fail('bad_request', 'The error must be a string.');
+    }
+    if (typeof frame.error === 'string' && frame.error.trim()) return { ok: true, frame };
+    if (typeof frame.output !== 'string' || typeof frame.summary !== 'string') {
+        return fail('bad_request', 'The output and the summary must be strings.');
+    }
+    if (frame.changes !== undefined) {
+        if (!Array.isArray(frame.changes)) return fail('bad_request', 'The changes must be a list.');
+        for (const change of frame.changes) {
+            if (!isRecord(change)) return fail('bad_request', 'A change must be an object.');
+            if (!CHANGE_OPS.includes(change.op)) {
+                return fail('bad_request', `The op of a change must be one of: ${CHANGE_OPS.join(', ')}.`);
+            }
+            if (typeof change.path !== 'string' || !change.path.trim()) {
+                return fail('bad_request', 'The path of a change must be a string.');
+            }
         }
     }
     return { ok: true, frame };

@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 13 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом).
+> Актуальный статус: **шаг 14 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -252,10 +252,13 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/autocomplete.test.js` — 19 тестов: окно, курсор в срезе, отказ на гигантской строке, чистка вставки, HTTP- и WebSocket-мост
 
 ### step-14 — Обработка инструментов в шине
-- [ ] `src/server/u2ai.js` — `tool.request` → `tool.result`, таймаут запроса
-- [ ] `src/server/u2ai.js` — `processing.claim` / `processing.claimed` / `processing.held` / `processing.released`
-- [ ] `src/tools/tools.js` — исполнение запроса инструмента по имени и аргументам, категории approve
-- [ ] `test/processing.test.js` — захват обработки, маршрутизация запроса, ответ
+- [x] `src/server/u2ai.js` — `tool.request` → `tool.result`, таймаут запроса (120 с, `limits.toolTimeoutMs`)
+- [x] `src/server/u2ai.js` — `processing.claim` / `processing.claimed` / `processing.held` / `processing.released`
+- [x] `src/server/u2ai.js` — `requestTool` и `runTool`: держатель отвечает, иначе сервер исполняет инструмент сам
+- [x] `src/tools/tools.js` — исполнение запроса инструмента по имени и аргументам, категории approve (`ask`/`read`/`write`/`all`)
+- [x] `src/tools/tools.js` — `TOOL_ALIASES`: имя `replace_text` монолита ведёт к `replace_in_file`
+- [x] `src/shared/protocol.js`, `src/shared/decoder.js` — кадры `processing.claim` и `tool.result`, проверка полей
+- [x] `test/processing.test.js` — 19 тестов: захват обработки, маршрутизация запроса, ответ, таймаут, локальное исполнение
 
 ### step-15 — HTTP-API для расширений
 - [ ] `src/server/http.js` — `GET /health`, `GET /v1/tools`, `POST /v1/complete`, `POST /v1/structure` (заглушка), `GET /v1/serves`

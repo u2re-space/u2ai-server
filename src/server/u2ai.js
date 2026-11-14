@@ -14,6 +14,10 @@
  *   The hub knows nothing about the work itself: the runner is plugged in by the caller,
  *   and the hub only keeps the bookkeeping of the runs.
  *
+ *   A client may hold a tool of a run for itself: it sends `processing.claim`, and the
+ *   server asks that client to run the tool with `tool.request` instead of running it.
+ *   The client answers with `tool.result`.
+ *
  * @depends node:crypto, shared/protocol, shared/decoder, shared/encoder
  * @usedBy server/serve, cli
  * @exports createHub, attachConnection, attachCompletionSocket
@@ -22,8 +26,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { COMMANDS, FRAME_TYPES, DECISIONS, PROTOCOL_VERSION } from '../shared/protocol.js';
+import { COMMANDS, FRAME_TYPES, DECISIONS, PROTOCOL_VERSION, TOOL_REQUEST_TIMEOUT_MS } from '../shared/protocol.js';
 import { validateFrame, validateStart, decodeFrame } from '../shared/decoder.js';
+import { executeToolRequest } from '../tools/tools.js';
 import {
     errorFrame,
     encodeFrame,
@@ -71,7 +76,7 @@ function publicRun(run) {
  * Create the hub of the bus.
  *
  * @param {{ token: string, onStart?: Function, onComplete?: Function|null,
- *           createId?: () => string, now?: () => string }} options
+ *           toolTimeoutMs?: number, createId?: () => string, now?: () => string }} options
  * @returns {object}
  * @exports
  * @ai.hint io
@@ -80,6 +85,7 @@ export function createHub({
     token,
     onStart = async () => {},
     onComplete = null,
+    toolTimeoutMs = TOOL_REQUEST_TIMEOUT_MS,
     createId = () => randomUUID(),
     now = () => new Date().toISOString(),
 } = {}) {
@@ -140,6 +146,7 @@ export function createHub({
             controller: new AbortController(),
             queue: [],
             waiters: [],
+            holders: new Map(),
             source: 'client',
             command: null,
             title: '',
@@ -178,6 +185,7 @@ export function createHub({
             if (item.runId !== runId) continue;
             if (item.kind === 'approval') item.resolve('abort');
             else if (item.kind === 'question') item.resolve(null);
+            else if (item.kind === 'tool') item.resolve(new Error('The run is over.'));
             pending.delete(requestId);
         }
         runs.delete(runId);
@@ -316,6 +324,11 @@ export function createHub({
      */
     function disconnect(socket) {
         sockets.delete(socket.id);
+        for (const [requestId, item] of [...pending]) {
+            if (item.kind !== 'tool' || item.holderId !== socket.id) continue;
+            item.resolve(new Error('The holder of the tool is gone.'));
+            pending.delete(requestId);
+        }
         for (const run of [...runs.values()]) {
             if (run.status !== 'running') continue;
             if (run.ownerId !== socket.id) continue;
@@ -457,6 +470,10 @@ export function createHub({
             case 'approve':
             case 'answer':
                 return control(socket, frame);
+            case 'processing.claim':
+                return claim(socket, frame);
+            case 'tool.result':
+                return toolResult(socket, frame);
             case 'complete':
                 if (!onComplete) {
                     send(socket, errorFrame('not_ready', 'The completion bridge is not running yet.'));
@@ -499,6 +516,169 @@ export function createHub({
     }
 
     /**
+     * The names of the tools that the sockets hold for the run.
+     * @param {object} run
+     * @returns {string[]}
+     * @ai.hint pure
+     */
+    function heldTools(run) {
+        return [...run.holders.keys()].sort();
+    }
+
+    /**
+     * A socket holds the tools of a run for itself.
+     *
+     * The tools that another socket held and this socket takes are released: that socket
+     * gets `processing.released`. The socket that claimed gets `processing.claimed`, and
+     * the run publishes `processing.held` with the names of the tools that are held.
+     *
+     * @param {object} socket
+     * @param {object} frame
+     * @returns {void}
+     * @ai.hint pure
+     */
+    function claim(socket, frame) {
+        const run = typeof frame.runId === 'string' ? runs.get(frame.runId) : null;
+        if (!run || run.status !== 'running') {
+            send(socket, errorFrame('unknown_run', 'The run is unknown or already finished.'));
+            return;
+        }
+        const tools = Array.isArray(frame.tools) ? frame.tools.map(String) : [];
+        const next = new Set(tools);
+        /** @type {Map<string, string[]>} */
+        const released = new Map();
+        for (const [name, holderId] of [...run.holders.entries()]) {
+            const mine = holderId === socket.id;
+            if (mine && !next.has(name)) run.holders.delete(name);
+            if (!mine && next.has(name)) {
+                run.holders.delete(name);
+                const names = released.get(holderId) ?? [];
+                names.push(name);
+                released.set(holderId, names);
+            }
+        }
+        for (const name of tools) run.holders.set(name, socket.id);
+        for (const [holderId, names] of released) {
+            sockets.get(holderId)?.send({ type: 'processing.released', runId: run.id, tools: names.sort() });
+        }
+        socket.send({ type: 'processing.claimed', runId: run.id, tools: [...tools] });
+        publish(run.id, { type: 'processing.held', tools: heldTools(run) });
+    }
+
+    /**
+     * Ask the holder of a tool to run it.
+     *
+     * A tool that nobody holds is not a request: the answer is `null`, and the caller
+     * runs the tool itself. A holder that does not answer in time is a failure: the run
+     * goes on without the tool.
+     *
+     * @param {string} runId
+     * @param {string} name
+     * @param {object} args
+     * @param {{ signal?: AbortSignal|null, timeoutMs?: number }} [options]
+     * @returns {Promise<{ output: string, summary: string, changes: object[] }|null>}
+     * @ai.hint pure
+     */
+    function requestTool(runId, name, args = {}, { signal = null, timeoutMs = toolTimeoutMs } = {}) {
+        if (signal?.aborted) return Promise.reject(abortError());
+        const run = runs.get(runId);
+        if (!run || run.status !== 'running') {
+            return Promise.reject(new Error('The run is unknown or already finished.'));
+        }
+        const holderId = run.holders.get(name);
+        if (!holderId) return Promise.resolve(null);
+        const holder = sockets.get(holderId);
+        if (!holder) return Promise.reject(new Error('The holder of the tool is gone.'));
+        const requestId = createId();
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            /**
+             * @param {Error|null} error
+             * @param {object} [value]
+             * @returns {void}
+             * @ai.hint pure
+             */
+            const done = (error, value) => {
+                if (settled) return;
+                settled = true;
+                pending.delete(requestId);
+                signal?.removeEventListener('abort', onAbort);
+                clearTimeout(timer);
+                if (error) reject(error);
+                else resolve(value);
+            };
+            /** @returns {void} */
+            const onAbort = () => done(abortError());
+            const timer = setTimeout(() => {
+                done(new Error(`The holder of the tool ${name} did not answer in time.`));
+            }, timeoutMs);
+            timer.unref?.();
+            pending.set(requestId, { runId, holderId, kind: 'tool', resolve: done });
+            if (signal) signal.addEventListener('abort', onAbort, { once: true });
+            holder.send({ type: 'tool.request', runId, requestId, name, args });
+        });
+    }
+
+    /**
+     * The answer of the holder of a tool.
+     * @param {object} socket
+     * @param {object} frame
+     * @returns {void}
+     * @ai.hint pure
+     */
+    function toolResult(socket, frame) {
+        const item = typeof frame.requestId === 'string' ? pending.get(frame.requestId) : null;
+        if (!item || item.kind !== 'tool') {
+            send(socket, errorFrame('bad_request', 'The requestId is unknown.'));
+            return;
+        }
+        if (item.holderId !== socket.id) {
+            send(socket, errorFrame('bad_request', 'This requestId belongs to another socket.'));
+            return;
+        }
+        if (typeof frame.error === 'string' && frame.error.trim()) {
+            item.resolve(new Error(frame.error));
+            return;
+        }
+        item.resolve(null, {
+            output: typeof frame.output === 'string' ? frame.output : '',
+            summary: typeof frame.summary === 'string' ? frame.summary : '',
+            changes: Array.isArray(frame.changes) ? frame.changes : [],
+        });
+    }
+
+    /**
+     * Run a tool of a run: the holder runs it, or the server does.
+     *
+     * The permission of the user is asked only when the server runs the tool itself: a
+     * holder of the extension has already asked its own user.
+     *
+     * @param {string} runId
+     * @param {string} name
+     * @param {object} args
+     * @param {{ root?: string, config?: object|null, signal?: AbortSignal|null, approve?: string,
+     *           timeoutMs?: number }} [options]
+     * @returns {Promise<{ ok: boolean, output: string, summary: string,
+     *           changes: object[], error: string|null }>}
+     * @ai.hint pure
+     */
+    async function runTool(runId, name, args = {}, {
+        root = null,
+        config = null,
+        signal = null,
+        approve = 'ask',
+        timeoutMs = toolTimeoutMs,
+    } = {}) {
+        const answer = await requestTool(runId, name, args, { signal, timeoutMs });
+        if (answer) return { ok: true, error: null, ...answer };
+        const approveFn = async (request) => {
+            const decision = await requestApproval(runId, request, signal);
+            return decision === 'yes' || decision === 'always';
+        };
+        return await executeToolRequest(name, args, { root, config, signal, approve, approveFn });
+    }
+
+    /**
      * The answer of the client to an approval or to a question.
      * @param {object} socket
      * @param {object} frame
@@ -533,6 +713,8 @@ export function createHub({
         publish,
         requestApproval,
         requestQuestion,
+        requestTool,
+        runTool,
         waitInput,
         finish,
         shutdown,

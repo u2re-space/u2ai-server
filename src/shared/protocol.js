@@ -10,9 +10,9 @@
  * @depends nothing
  * @usedBy shared/encoder, shared/decoder, server/ws, server/u2ai, server/http, agent/autocomplete
  * @exports PROTOCOL_VERSION, MAX_FRAME_BYTES, MAX_COMPLETION_CONTEXT_BYTES,
- *          MAX_COMPLETION_FRAME_BYTES, COMPLETION_WINDOWS, COMMANDS, APPROVE_MODES, DECISIONS,
- *          START_FIELDS, REJECTED_START_FIELDS, FRAME_TYPES, EVENT_TYPES, PROCESSABLE_TOOLS,
- *          END_STATUSES, ROLES, completionWindowLines
+ *          MAX_COMPLETION_FRAME_BYTES, TOOL_REQUEST_TIMEOUT_MS, COMPLETION_WINDOWS, COMMANDS,
+ *          APPROVE_MODES, DECISIONS, START_FIELDS, REJECTED_START_FIELDS, FRAME_TYPES,
+ *          EVENT_TYPES, PROCESSABLE_TOOLS, END_STATUSES, ROLES, completionWindowLines
  * @ai.tags protocol, shared
  * @ai.hint pure
  */
@@ -28,6 +28,14 @@ export const MAX_COMPLETION_CONTEXT_BYTES = 262_144;
 
 /** A completion frame bigger than this shrinks the window of the file. */
 export const MAX_COMPLETION_FRAME_BYTES = 900_000;
+
+/**
+ * How long the server waits for the answer of the holder of a tool.
+ *
+ * A holder that never answers must not hold the run forever: the request fails and the
+ * run goes on.
+ */
+export const TOOL_REQUEST_TIMEOUT_MS = 120_000;
 
 /**
  * The radii of the window around the cursor: the lines above and below it.
@@ -87,6 +95,7 @@ export const REJECTED_START_FIELDS = Object.freeze(['background', 'detach', 'job
 /** The frames a client may send. */
 export const FRAME_TYPES = Object.freeze([
     'hello', 'start', 'input', 'approve', 'answer', 'complete', 'cancel', 'subscribe', 'unsubscribe', 'ping',
+    'processing.claim', 'tool.result',
 ]);
 
 /**
@@ -100,11 +109,17 @@ export const EVENT_TYPES = Object.freeze([
     'text.delta', 'text.done', 'reasoning.delta', 'tool.exec.start', 'tool.exec.done',
     'warning', 'error', 'image.saved', 'image.progress', 'response.done',
     'approval.pending', 'question.pending', 'processing.held',
+    'processing.claimed', 'processing.released', 'tool.request',
 ]);
 
-/** The tools a client may hold for a run. */
+/**
+ * The tools a client may hold for a run.
+ *
+ * The names are the ones of the monolith of the version 0.2: an extension that holds
+ * `replace_text` keeps working, and the server maps the name to `replace_in_file`.
+ */
 export const PROCESSABLE_TOOLS = Object.freeze([
-    'copy_path', 'delete_file', 'list_files', 'read_file', 'replace_text',
+    'copy_path', 'delete_file', 'list_files', 'read_file', 'replace_text', 'replace_in_file',
     'run_command', 'run_script', 'search_files', 'write_file',
 ]);
 
