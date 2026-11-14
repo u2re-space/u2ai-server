@@ -1,0 +1,368 @@
+/**
+ * @file src/openai/batch.js
+ * @module openai/batch
+ * @purpose The batch route of the OpenAI-compatible hosts: a file of requests, one batch, and
+ *          later — in another run — the file of the answers.
+ *
+ *   The batch route is two-phase by nature. The first phase uploads the file of the requests and
+ *   creates the batch; the host works on it in the background, up to a day. The second phase asks
+ *   the host how the batch is doing and, when it is done, downloads the file of the answers. The
+ *   answers are named by `custom_id`, and that name is the only way back to the question: the
+ *   order of the lines of the result file is not the order of the questions.
+ *
+ *   A batch costs half the price of the same requests one by one, and a request that fails inside
+ *   a batch does not spoil the others.
+ *
+ * @depends node:crypto, node:timers/promises, openai/http
+ * @usedBy openai/client
+ * @exports BATCH_ENDPOINT, BATCH_WINDOW, BATCH_SUBMITTED, batchEndpointFor, buildBatchJsonl,
+ *          parseBatchResults, submitBatch, fetchBatch, runBatch, batchSubmittedError
+ * @ai.tags openai, batch, api
+ * @ai.hint io
+ */
+
+import { randomBytes } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { ApiError } from './http.js';
+
+/** The route the batch speaks: the same one the requests inside it use. */
+export const BATCH_ENDPOINT = '/v1/responses';
+
+/** The window the hosts serve: a day is the only one they know. */
+export const BATCH_WINDOW = '24h';
+
+/** The code of the error that says: the batch is out, the answers are not here yet. */
+export const BATCH_SUBMITTED = 'BATCH_SUBMITTED';
+
+/** How often the state of the batch is asked for. */
+const DEFAULT_POLL_MS = 5000;
+
+/** How long the client waits for the batch before it gives up. */
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** The states a batch does not come out of. */
+const FINAL_STATUS = new Set(['failed', 'expired', 'cancelled']);
+
+/**
+ * The error that stops the run: the batch is submitted, the answers are not here yet.
+ * @param {{ batchId?: string|null, requests?: number }} [details]
+ * @returns {ApiError}
+ * @ai.hint pure
+ */
+export function batchSubmittedError({ batchId = null, requests = 0 } = {}) {
+    return new ApiError(
+        `The batch ${batchId ?? ''} was submitted (${requests} request(s)); the answers are not here yet.`,
+        { code: BATCH_SUBMITTED, details: { batchId, requests } },
+    );
+}
+
+/**
+ * The route of the batch for one host.
+ *
+ * The line of a request names the route it goes to, and the route of the batch has to be the
+ * same one. The base URL of a host ends with the prefix of the API (`/v1`), so the route is that
+ * prefix and the name of the API.
+ * @param {string} baseURL the base URL of the host
+ * @param {string} [route] the name of the API
+ * @returns {string} the path of the route, e.g. `/v1/responses`
+ * @ai.hint pure
+ */
+export function batchEndpointFor(baseURL, route = 'responses') {
+    let pathname = '/v1';
+    try {
+        pathname = new URL(String(baseURL)).pathname.replace(/\/+$/, '');
+    } catch {
+        pathname = '/v1';
+    }
+    if (!pathname) pathname = '/v1';
+    if (!pathname.endsWith('/v1')) pathname = `${pathname}/v1`;
+    return `${pathname}/${route}`;
+}
+
+/**
+ * Build a multipart/form-data body.
+ * @param {{ fields?: Record<string, string|number|undefined|null>, files?: Array<{ field?: string, filename: string, mime: string, bytes: Buffer }> }} params
+ * @returns {{ body: Buffer, contentType: string }}
+ * @ai.hint pure
+ */
+function encodeMultipart({ fields = {}, files = [] } = {}) {
+    const boundary = `aid${randomBytes(12).toString('hex')}`;
+    const chunks = [];
+    for (const [name, value] of Object.entries(fields)) {
+        if (value === undefined || value === null) continue;
+        chunks.push(Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+        ));
+    }
+    for (const file of files) {
+        const filename = String(file.filename ?? 'batch.jsonl').replace(/["\r\n]/g, '');
+        const field = String(file.field ?? 'file');
+        chunks.push(Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${filename}"\r\nContent-Type: ${file.mime ?? 'application/jsonl'}\r\n\r\n`,
+        ));
+        chunks.push(Buffer.isBuffer(file.bytes) ? file.bytes : Buffer.from(file.bytes ?? []));
+        chunks.push(Buffer.from('\r\n'));
+    }
+    chunks.push(Buffer.from(`--${boundary}--\r\n`));
+    return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
+/**
+ * The file of a batch: one request per line, no commas between the lines.
+ *
+ * Every line names the request by `custom_id`, and that name is the only way back to the answer:
+ * the order of the lines of the result file is not the order of the questions.
+ * @param {Array<{ customId: string, url?: string, method?: string, body?: object }>} requests
+ * @returns {Buffer} the file
+ * @ai.hint pure
+ */
+export function buildBatchJsonl(requests = []) {
+    const lines = [];
+    for (const request of requests) {
+        if (!request?.customId) continue;
+        lines.push(JSON.stringify({
+            custom_id: String(request.customId),
+            method: String(request.method ?? 'POST'),
+            url: String(request.url ?? BATCH_ENDPOINT),
+            body: request.body ?? {},
+        }));
+    }
+    return Buffer.from(lines.length ? `${lines.join('\n')}\n` : '', 'utf8');
+}
+
+/**
+ * The answers of a batch: the file of the result, one answer per line.
+ *
+ * A request that failed has an `error` of its own and does not spoil the others: the line is
+ * read as a failure, not as the end of the file.
+ * @param {string} text the result file
+ * @returns {Map<string, { ok: boolean, body?: object, status?: number, error?: string }>}
+ * @ai.hint pure
+ */
+export function parseBatchResults(text) {
+    const out = new Map();
+    for (const line of String(text ?? '').split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let row = null;
+        try { row = JSON.parse(trimmed); } catch { continue; }
+        const customId = String(row?.custom_id ?? '').trim();
+        if (!customId) continue;
+        const status = Number(row?.response?.status_code ?? 0);
+        if (row?.error) {
+            const reason = row.error?.message ?? row.error?.code ?? 'the request failed';
+            out.set(customId, { ok: false, error: String(reason) });
+            continue;
+        }
+        if (row?.response?.body === undefined || row?.response?.body === null) {
+            out.set(customId, { ok: false, error: `the answer has no body (status ${status || 'unknown'})` });
+            continue;
+        }
+        out.set(customId, { ok: true, body: row.response.body, status });
+    }
+    return out;
+}
+
+/**
+ * Upload the file of the requests.
+ * @param {{ call: Function }} channel the host the batch belongs to
+ * @param {Buffer} jsonl the file
+ * @param {{ filename?: string, signal?: AbortSignal|null }} [options]
+ * @returns {Promise<string>} the id of the file
+ * @ai.hint io
+ */
+async function uploadBatchFile(channel, jsonl, { filename = 'batch.jsonl', signal = null } = {}) {
+    const { body, contentType } = encodeMultipart({
+        fields: { purpose: 'batch' },
+        files: [{ field: 'file', filename, mime: 'application/jsonl', bytes: jsonl }],
+    });
+    const answer = await channel.call('files', { method: 'POST', rawBody: body, contentType, signal });
+    const id = String(answer?.id ?? '').trim();
+    if (!id) {
+        throw new ApiError('The host did not return the id of the batch file.', {
+            code: 'INVALID_RESPONSE',
+            details: { keys: Object.keys(answer ?? {}) },
+        });
+    }
+    return id;
+}
+
+/**
+ * Create the batch of the uploaded file.
+ * @param {{ call: Function }} channel the host the batch belongs to
+ * @param {{ inputFileId: string, endpoint?: string, window?: string, signal?: AbortSignal|null }} options
+ * @returns {Promise<{ id: string, status: string, raw: object }>}
+ * @ai.hint io
+ */
+async function createBatch(channel, {
+    inputFileId, endpoint = BATCH_ENDPOINT, window = BATCH_WINDOW, signal = null,
+} = {}) {
+    const answer = await channel.call('batches', {
+        method: 'POST',
+        body: { input_file_id: inputFileId, endpoint, completion_window: window },
+        signal,
+    });
+    const id = String(answer?.id ?? '').trim();
+    if (!id) {
+        throw new ApiError('The host did not return the id of the batch.', {
+            code: 'INVALID_RESPONSE',
+            details: { keys: Object.keys(answer ?? {}) },
+        });
+    }
+    return { id, status: String(answer?.status ?? 'unknown'), raw: answer };
+}
+
+/**
+ * Wait for the batch to be done.
+ * @param {{ call: Function }} channel the host the batch belongs to
+ * @param {string} id the id of the batch
+ * @param {{ signal?: AbortSignal|null, timeoutMs?: number, pollMs?: number, onPoll?: Function|null }} [options]
+ * @returns {Promise<object>} the answer of the host
+ * @ai.hint io
+ */
+async function waitBatch(channel, id, {
+    signal = null, timeoutMs = DEFAULT_TIMEOUT_MS, pollMs = DEFAULT_POLL_MS, onPoll = null,
+} = {}) {
+    const startedAt = Date.now();
+    let polls = 0;
+    for (;;) {
+        signal?.throwIfAborted();
+        const answer = await channel.call(`batches/${encodeURIComponent(id)}`, { method: 'GET', signal });
+        polls += 1;
+        const status = String(answer?.status ?? 'unknown');
+        try { onPoll?.({ id, status, polls, elapsedMs: Date.now() - startedAt }); } catch { /* observer */ }
+        if (status === 'completed') return answer;
+        if (FINAL_STATUS.has(status)) {
+            throw new ApiError(`The batch ended with the status "${status}".`, {
+                code: 'BATCH_FAILED',
+                details: { id, status, errors: answer?.errors ?? null },
+            });
+        }
+        if (Date.now() - startedAt > timeoutMs) {
+            throw new ApiError(`The batch did not finish within ${Math.round(timeoutMs / 60_000)} min (batch ${id}).`, {
+                code: 'BATCH_TIMEOUT',
+                details: { id, polls },
+            });
+        }
+        await sleep(pollMs, undefined, { signal }).catch(() => {
+            throw new ApiError('Waiting for the batch was interrupted.', { code: 'ABORTED' });
+        });
+    }
+}
+
+/**
+ * Download the file of the answers.
+ * @param {{ call: Function }} channel the host the batch belongs to
+ * @param {string} fileId the id of the output file
+ * @param {{ signal?: AbortSignal|null }} [options]
+ * @returns {Promise<string>} the file
+ * @ai.hint io
+ */
+async function downloadBatchFile(channel, fileId, { signal = null } = {}) {
+    const answer = await channel.call(`files/${encodeURIComponent(fileId)}/content`, {
+        method: 'GET',
+        signal,
+        raw: true,
+    });
+    if (typeof answer === 'string') return answer;
+    return String(answer?.body ?? '');
+}
+
+/**
+ * The first phase of the batch: the file goes out, the batch is created, the run waits.
+ *
+ * The host works on the batch in the background — up to a day — and the answers come in another
+ * run, when the client asks for them.
+ * @param {{ channel: { call: Function }, requests: Array<{ customId: string, url?: string, body?: object }>,
+ *   endpoint?: string, window?: string, signal?: AbortSignal|null }} options
+ * @returns {Promise<{ id: string, status: string, inputFileId: string, raw: object }>}
+ * @ai.hint io
+ */
+export async function submitBatch({
+    channel, requests = [], endpoint = BATCH_ENDPOINT, window = BATCH_WINDOW, signal = null,
+} = {}) {
+    if (!channel || typeof channel.call !== 'function') {
+        throw new ApiError('The batch has no host to run on.', { code: 'NO_BACKEND' });
+    }
+    const jsonl = buildBatchJsonl(requests);
+    if (!jsonl.length) {
+        throw new ApiError('The batch has no requests.', { code: 'INVALID_RESPONSE' });
+    }
+    const inputFileId = await uploadBatchFile(channel, jsonl, { signal });
+    const batch = await createBatch(channel, { inputFileId, endpoint, window, signal });
+    return { ...batch, inputFileId };
+}
+
+/**
+ * The second phase of the batch: ask how it is doing and, when it is done, take the answers.
+ *
+ * The wait is short by default: the batch may need hours, and a run that waits for it would
+ * look like a hung one. The answer says whether the batch is ready — the caller decides what to
+ * do with a batch that is not.
+ * @param {{ channel: { call: Function }, id: string, pollMs?: number, waitMs?: number,
+ *   signal?: AbortSignal|null, onPoll?: Function|null }} options
+ * @returns {Promise<{ ready: boolean, id: string, status: string, results: Map<string, object>, raw: object }>}
+ * @ai.hint io
+ */
+export async function fetchBatch({
+    channel, id, pollMs = DEFAULT_POLL_MS, waitMs = 0, signal = null, onPoll = null,
+} = {}) {
+    if (!channel || typeof channel.call !== 'function') {
+        throw new ApiError('The batch has no host to ask.', { code: 'NO_BACKEND' });
+    }
+    const deadline = Date.now() + Math.max(0, waitMs);
+    for (;;) {
+        signal?.throwIfAborted();
+        const answer = await channel.call(`batches/${encodeURIComponent(id)}`, { method: 'GET', signal });
+        const status = String(answer?.status ?? 'unknown');
+        try { onPoll?.({ id, status }); } catch { /* observer */ }
+        if (status === 'completed') {
+            const outputFileId = String(answer?.output_file_id ?? '').trim();
+            if (!outputFileId) {
+                throw new ApiError('The batch is done, but it has no file of answers.', {
+                    code: 'INVALID_RESPONSE',
+                    details: { id },
+                });
+            }
+            const text = await downloadBatchFile(channel, outputFileId, { signal });
+            return { ready: true, id, status, results: parseBatchResults(text), raw: answer };
+        }
+        if (FINAL_STATUS.has(status)) {
+            throw new ApiError(`The batch ended with the status "${status}".`, {
+                code: 'BATCH_FAILED',
+                details: { id, status, errors: answer?.errors ?? null },
+            });
+        }
+        if (Date.now() >= deadline) {
+            return { ready: false, id, status, results: new Map(), raw: answer };
+        }
+        await sleep(pollMs, undefined, { signal }).catch(() => {
+            throw new ApiError('Waiting for the batch was interrupted.', { code: 'ABORTED' });
+        });
+    }
+}
+
+/**
+ * Run the requests as one batch and wait for the answers: upload, create, wait, download.
+ * @param {{ channel: { call: Function }, requests: Array<{ customId: string, url?: string, body?: object }>,
+ *   endpoint?: string, window?: string, pollMs?: number, timeoutMs?: number,
+ *   signal?: AbortSignal|null, onPoll?: Function|null }} options
+ * @returns {Promise<{ id: string, results: Map<string, object>, raw: object }>}
+ * @ai.hint io
+ */
+export async function runBatch({
+    channel, requests = [], endpoint = BATCH_ENDPOINT, window = BATCH_WINDOW,
+    pollMs = DEFAULT_POLL_MS, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null, onPoll = null,
+} = {}) {
+    const batch = await submitBatch({ channel, requests, endpoint, window, signal });
+    const done = await waitBatch(channel, batch.id, { signal, timeoutMs, pollMs, onPoll });
+    const outputFileId = String(done?.output_file_id ?? '').trim();
+    if (!outputFileId) {
+        throw new ApiError('The batch is done, but it has no file of answers.', {
+            code: 'INVALID_RESPONSE',
+            details: { id: batch.id },
+        });
+    }
+    const text = await downloadBatchFile(channel, outputFileId, { signal });
+    return { id: batch.id, results: parseBatchResults(text), raw: done };
+}

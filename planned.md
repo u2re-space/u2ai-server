@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **план согласован, шаги не начаты**.
+> Актуальный статус: **шаг 3 из 19 выполнен** (каркас, конфиг, OpenAI-слой).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -158,13 +158,15 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/config.test.js` — 16 тестов: приоритеты, плейсхолдеры, русские сообщения
 
 ### step-3 — OpenAI-слой
-- [ ] `src/openai/{fetch,http}.js` — транспорт на чистом `fetch`
-- [ ] `src/openai/responses.js` — тело Responses-запроса, `parseResponse`, `parseJsonText`
-- [ ] `src/openai/chat.js` — запасной транспорт Chat Completions
-- [ ] `src/openai/fallback.js` — `fallbackWorthy`, `modelRefusal`, цепочка систем и моделей
-- [ ] `src/openai/client.js` — ротация бэкендов, ретраи, `responses.create`
-- [ ] `src/openai/{completions,batch,decision}.js` — батчи, решения, алиасы
-- [ ] `src/model/profiles.js` — профили моделей, усилие reasoning, лимиты контекста
+- [x] `src/openai/{fetch,http}.js` — транспорт на чистом `fetch`
+- [x] `src/openai/responses.js` — тело Responses-запроса, `parseResponse`, `parseJsonText`
+- [x] `src/openai/chat.js` — запасной транспорт Chat Completions
+- [x] `src/openai/fallback.js` — `fallbackWorthy`, `modelRefusal`, цепочка систем и моделей
+- [x] `src/openai/client.js` — ротация бэкендов, ретраи, `responses.create`
+- [x] `src/openai/{completions,batch,decision}.js` — батчи, решения, алиасы
+- [x] `src/model/profiles.js` — профили моделей, усилие reasoning, лимиты контекста
+- [x] `test/openai.test.js` — 53 теста: тело запроса, разбор ответа, fallback, бэкенды,
+      чат-транспорт, решения, батчи, профили моделей
 
 ### step-4 — Протокол `ai-serve`: кадры и кодирование
 - [ ] `src/shared/protocol.js` — константы протокола, лимиты кадра (1 МиБ), окно дополнения (262144/900000 байт)
