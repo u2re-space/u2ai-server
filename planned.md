@@ -359,7 +359,11 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `README.md` — раздел «The agent behind the bus»
 
 ### step-A2 — Контракт `serve.json`
-- [ ] Поля `httpURL`, `complete`, `structure`, `completeWs`, `mcp`, `protocol` в записи сервера
+- [x] Поля `httpURL`, `complete`, `structure`, `completeWs`, `mcp`, `protocol` в записи сервера
+- [x] `src/server/serve.js` — `startServe` отдаёт и `record`, и те же поля в `handle`
+- [x] `src/cli.js` — `serve` печатает адрес моста дополнения и адрес MCP
+- [x] `test/serve.test.js` — 2 теста: контракт записи, адрес MCP
+- [x] `README.md` — раздел «The contract of `serve.json`»
 
 ### step-A3 — Протокол 0.4
 - [ ] Кадр `tools.register`: клиент публикует свои инструменты

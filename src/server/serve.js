@@ -260,6 +260,12 @@ export async function startServe({
         pid: process.pid,
         url: listener.url,
         httpURL: listener.httpURL,
+        // The routes of the HTTP part and of the bridge of the completion.
+        complete: `${listener.httpURL}/v1/complete`,
+        structure: `${listener.httpURL}/v1/structure`,
+        completeWs: `${listener.url}/v1/complete`,
+        // The MCP endpoint shares the port and the token of the bus.
+        mcp: mcp ? `${listener.httpURL}/mcp` : null,
         token,
         protocol: PROTOCOL_VERSION,
         startedAt: new Date().toISOString(),
@@ -293,6 +299,11 @@ export async function startServe({
         token,
         file: target,
         record,
+        // The addresses of the parts of the server: the clients read them from here.
+        complete: record.complete,
+        structure: record.structure,
+        completeWs: record.completeWs,
+        mcp: record.mcp,
         close,
     };
 }

@@ -76,6 +76,25 @@ moves it):
 | `~/.ai-serve/logs/` | The logs. |
 | `~/.ai-serve/serve.json` | The address of the running server. Written by the server, mode `0600`, removed when the server stops. |
 
+### The contract of `serve.json`
+
+The file is the address of the running server. A client reads it, checks the pid, and
+connects. The old fields are still there — a client of the version 0.2 keeps working — and
+the new ones name the parts of the server:
+
+| Field | What it is |
+|---|---|
+| `pid` | The process of the server. A client checks it before it connects. |
+| `url` | The WebSocket of the bus: `ws://127.0.0.1:<port>`. |
+| `token` | The secret of the server. The client sends it in the `hello` frame. |
+| `httpURL` | The root of the HTTP part. |
+| `complete` | The route of the completion: `<httpURL>/v1/complete`. |
+| `structure` | The route of the structure: `<httpURL>/v1/structure`. |
+| `completeWs` | The WebSocket of the completion: `<url>/v1/complete`. |
+| `mcp` | The endpoint of the MCP server: `<httpURL>/mcp`, or `null` when there is none. |
+| `protocol` | The version of the protocol of the bus. |
+| `startedAt` | When the server started. |
+
 ---
 
 ## The configuration
@@ -369,7 +388,7 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 414 tests
+npm test          # 416 tests
 npm pack --dry-run
 ```
 

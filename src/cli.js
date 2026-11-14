@@ -190,7 +190,8 @@ async function commandServe(opts) {
 
     console.log(`Bus: ${handle.url}`);
     console.log(`HTTP: ${handle.httpURL}`);
-    console.log(`MCP: ${handle.httpURL.replace(/\/$/, '')}/mcp`);
+    console.log(`Complete: ${handle.complete}`);
+    console.log(`MCP: ${handle.mcp}`);
     if (handle.file) console.log(`File: ${handle.file}`);
     console.log('Press Ctrl+C to stop.');
 

@@ -14,6 +14,7 @@ import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { startServe, pidAlive, readServeRecord, writeServeRecord } from '../src/server/serve.js';
 import { acceptKey, encodeWsFrame, listenWebSocket, MAX_FRAME_BYTES } from '../src/server/ws.js';
 import { createHttpHandler, checkToken, readJsonBody } from '../src/server/http.js';
+import { PROTOCOL_VERSION } from '../src/shared/protocol.js';
 
 /**
  * A fresh home directory for one test.
@@ -84,6 +85,30 @@ test('the server writes the file with its address and removes it on the way out'
     assert.ok(record.token.length >= 32);
     await handle.close();
     assert.equal(await readServeRecord(file), null);
+});
+
+test('the record names every part of the server', async () => {
+    const home = await tempHome();
+    const handle = await startServe({ home, port: 0 });
+    const file = path.join(home, 'serve.json');
+    const record = JSON.parse(await readFile(file, 'utf8'));
+    assert.equal(record.httpURL, `http://127.0.0.1:${handle.port}`);
+    assert.equal(record.complete, `${record.httpURL}/v1/complete`);
+    assert.equal(record.structure, `${record.httpURL}/v1/structure`);
+    assert.equal(record.completeWs, `${record.url}/v1/complete`);
+    assert.equal(record.mcp, null);
+    assert.equal(record.protocol, PROTOCOL_VERSION);
+    assert.ok(record.startedAt);
+    await handle.close();
+});
+
+test('the record names the MCP endpoint when the server has one', async () => {
+    const home = await tempHome();
+    const handle = await startServe({ home, port: 0, mcp: { handle: async () => null } });
+    const record = JSON.parse(await readFile(path.join(home, 'serve.json'), 'utf8'));
+    assert.equal(record.mcp, `${record.httpURL}/mcp`);
+    assert.equal(handle.mcp, record.mcp);
+    await handle.close();
 });
 
 test('the file with the token is readable by its owner only', async (t) => {
