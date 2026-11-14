@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 6 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины).
+> Актуальный статус: **шаг 7 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -190,10 +190,11 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] `test/hub.test.js` — 21 тест: жизненный цикл прогона, approve, вопрос, ввод, отмена, подписки
 
 ### step-7 — Инструменты файловой системы
-- [ ] `src/agent/access.js` — корень доступа, пути внутри корня, запрет секретов
-- [ ] `src/tools/filesystem.js` — `listFiles`, `readTextFile`, `searchFiles`, `writeTextFile`, `replaceInFile`, `deleteFile`, `makeDirectory`, `copyPath`
-- [ ] `src/tools/tools.js` — каталог инструментов: имя, описание, схема параметров, категория, риск
-- [ ] `test/filesystem.test.js` — запись только в разрешённые каталоги, отказ за пределами корня
+- [x] `src/agent/access.js` — корень доступа, пути внутри корня, запрет секретов
+- [x] `src/tools/filesystem.js` — `listFiles`, `readTextFile`, `searchFiles`, `writeTextFile`, `replaceInFile`, `deleteFile`, `makeDirectory`, `copyPath`
+- [x] `src/tools/tools.js` — каталог инструментов: имя, описание, схема параметров, категория, риск
+- [x] `src/shared/format.js` — `formatBytes`, `formatDuration`, `truncateText`
+- [x] `test/filesystem.test.js` — 47 тестов: корень доступа, секреты, список, чтение, поиск, запись, замена, удаление, копирование, схемы
 
 ### step-8 — Терминал и команды
 - [ ] `src/tools/terminal.js` — `runCommand`, `runProgram`, оболочки (`powershell`, `pwsh`, `cmd`, `bash`, `sh`, `zsh`), таймауты, лимит вывода

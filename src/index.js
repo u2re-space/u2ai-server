@@ -112,3 +112,37 @@ export {
 export { HTTP_ROUTES, checkToken, requestToken, readJsonBody, createHttpHandler } from './server/http.js';
 export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServe } from './server/serve.js';
 export { createHub, attachConnection } from './server/u2ai.js';
+
+export {
+    NOISY_DIRS,
+    isProtectedFileName,
+    isForbiddenDirName,
+    toPosix,
+    isInside,
+    resolveInside,
+    createAccess,
+} from './agent/access.js';
+export { formatBytes, formatDuration, truncateText } from './shared/format.js';
+export {
+    listFiles,
+    readTextFile,
+    searchFiles,
+    writeTextFile,
+    replaceInFile,
+    deleteFile,
+    makeDirectory,
+    copyPath,
+    isBinaryFile,
+} from './tools/filesystem.js';
+export {
+    TOOL_SPECS,
+    TOOL_NAMES,
+    TOOL_CATEGORIES,
+    TOOL_RISKS,
+    toolDefinitions,
+    describeTool,
+    toolCategory,
+    toolRisk,
+    toolsByCategory,
+    executeTool,
+} from './tools/tools.js';
