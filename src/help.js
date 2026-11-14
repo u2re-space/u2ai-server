@@ -37,6 +37,9 @@ Commands:
   complete             Print a one-off completion for a file and a line.
                        Use --file <path> and --line <n> (1-based).
   services             List the external services (ai-serve and MCP) and their state.
+                       'services add <name> --url <url>' registers a service in config.json,
+                       'services add-mcp <name> --command <cmd>' an MCP server in mcp.json,
+                       'services remove <name>' takes one away.
   config               Print the resolved configuration.
   doctor               Check the environment: Node, config, keys, port, services.
 
@@ -47,6 +50,10 @@ Options:
   -f, --file <path>    The file of the completion.
       --line <n>       The line of the completion (1-based).
       --language <id>  The language of the file (for example js, ts, py).
+      --url <url>      The address of a service.
+      --token <token>  The token of a service.
+      --command <cmd>  The command of a service that is started by the package.
+      --arg <value>    An argument of the command; the flag may be repeated.
       --http           The MCP server speaks HTTP instead of stdio.
       --stdio          The MCP server speaks stdio (default).
   -c, --config <file>   The config file to use.

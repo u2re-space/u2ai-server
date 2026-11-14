@@ -143,9 +143,36 @@ export function roleToolNames(config = null, role = 'agent') {
 }
 
 /**
+ * Run a tool of the role: a tool of the catalog, or a tool of an external MCP server.
+ *
+ * The proxy is asked first: the names of the external tools are `server__tool`, and
+ * they never live in the catalog of the package.
+ *
+ * @param {string} name
+ * @param {object} args
+ * @param {{ root: string, config?: object|null, signal?: AbortSignal|null, proxy?: object|null }} context
+ * @returns {Promise<{ ok: boolean, name: string, text: string, data: object|null, error: string|null }>}
+ * @ai.hint io
+ */
+async function callRoleTool(name, args, { root, config = null, signal = null, proxy = null } = {}) {
+    if (proxy && typeof proxy.has === 'function' && proxy.has(name)) {
+        const answer = await proxy.call(name, args);
+        return {
+            ok: answer?.ok !== false,
+            name,
+            text: typeof answer?.text === 'string' ? answer.text : '',
+            data: answer?.data ?? null,
+            error: answer?.error ?? null,
+        };
+    }
+    return await callTool(name, args, { root, config, signal });
+}
+
+/**
  * Create the loop of a role: the function that asks the model and runs the tools.
  *
  * @param {{ client: object, config?: object|null, root: string, tools?: string[],
+ *           proxy?: object|null,
  *           model?: string|null, effort?: string|null, summary?: string|null,
  *           temperature?: number|null, maxOutputTokens?: number|null, instructions?: string|null,
  *           maxTurns?: number|null, signal?: AbortSignal|null, onEvent?: Function|null }} options
@@ -158,6 +185,7 @@ export function createRoleAsk({
     config = null,
     root,
     tools = [],
+    proxy = null,
     model = null,
     effort = null,
     summary = null,
@@ -170,7 +198,10 @@ export function createRoleAsk({
 } = {}) {
     if (!client?.responses?.create) throw new Error('The role needs an API client.');
     const limit = Number.isSafeInteger(maxTurns) && maxTurns > 0 ? maxTurns : 24;
-    const definitions = toolDefinitions(tools);
+    const definitions = [
+        ...toolDefinitions(tools),
+        ...(Array.isArray(proxy?.tools) ? proxy.tools : []),
+    ];
 
     /**
      * One request of the role: the model, the tools, the schema.
@@ -214,7 +245,7 @@ export function createRoleAsk({
                 };
             }
             for (const call of realCalls) {
-                const result = await callTool(call.name, call.arguments, { root, config, signal });
+                const result = await callRoleTool(call.name, call.arguments, { root, config, signal, proxy });
                 calls.push({ name: call.name, arguments: call.arguments, ok: result.ok, text: result.text });
                 const id = call.callId ?? call.id ?? null;
                 input.push({ type: 'function_call', call_id: id, name: call.name, arguments: call.raw ?? JSON.stringify(call.arguments ?? {}) });
@@ -239,7 +270,7 @@ export function createRoleAsk({
  * @param {string} role the name of the role
  * @param {{ task?: string, analysis?: object|null, plan?: object|null, context?: object|null,
  *           config?: object|null, client: object, root: string, env?: object, signal?: AbortSignal|null,
- *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null }} options
+ *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null, proxy?: object|null }} options
  * @returns {Promise<object>} the answer of the role
  * @exports
  * @ai.hint io
@@ -256,6 +287,7 @@ export async function runRole(role, {
     onEvent = null,
     maxTurns = null,
     model = null,
+    proxy = null,
 } = {}) {
     if (!ROLE_NAMES.includes(role)) throw new Error(`There is no role named ${role}.`);
     if (!client) throw new Error('The role needs an API client.');
@@ -280,6 +312,7 @@ export async function runRole(role, {
         config,
         root,
         tools: directTools,
+        proxy,
         model: model ?? settings.model,
         effort: settings.effort,
         summary: settings.summary,
@@ -304,7 +337,7 @@ export async function runRole(role, {
  * The server agent: the analysis, then the plan, then the work.
  *
  * @param {{ task: string, config?: object|null, client: object, root: string, signal?: AbortSignal|null,
- *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null }} options
+ *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null, proxy?: object|null }} options
  * @returns {Promise<{ analysis: object, plan: object, execution: object }>}
  * @exports
  * @ai.hint io

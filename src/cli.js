@@ -15,13 +15,15 @@ import { randomBytes } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
 import { loadConfig, redactConfig } from './config.js';
+import { readMcpFile, registerService, removeService, registerMcpServer, removeMcpServer } from './config/parser.js';
+import { defaultHome, homeConfigFile, homeMcpFile, serveFile } from './config/paths.js';
 import { startServe, readServeRecord, pidAlive } from './server/serve.js';
-import { serveFile } from './config/paths.js';
 import { createHub } from './server/u2ai.js';
 import { createMcpServer, startStdioServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { createClient } from './openai/client.js';
 import { completeAtCursor } from './agent/autocomplete.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed } from './tools/tools.js';
+import { normalizeServer, listServices, createToolProxy } from './client/proxy.js';
 import { ROLE_NAMES, runRole, runAgent } from './roles/index.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
@@ -311,6 +313,22 @@ async function commandAgent(opts) {
         return EXIT.failure;
     }
 
+    // The external MCP servers are a source of tools: the model calls them by the name
+    // of the proxy, and the call goes to the server that owns the tool.
+    let proxy = null;
+    const servers = Array.isArray(config.mcpServers) ? config.mcpServers : [];
+    if (servers.length) {
+        try {
+            proxy = await createToolProxy(servers, { env: process.env });
+            for (const failure of proxy.errors) {
+                console.error(`The MCP server ${failure.name} is not available: ${failure.message}`);
+            }
+        } catch (error) {
+            console.error(error?.message ?? String(error));
+            return EXIT.failure;
+        }
+    }
+
     try {
         if (role === 'agent') {
             const out = await runAgent({
@@ -319,6 +337,7 @@ async function commandAgent(opts) {
                 client,
                 root: cwd,
                 model: opts.model ?? null,
+                proxy,
             });
             printAgentResult(out, opts.json);
         } else {
@@ -328,12 +347,15 @@ async function commandAgent(opts) {
                 client,
                 root: cwd,
                 model: opts.model ?? null,
+                proxy,
             });
             printRoleResult(role, out, opts.json);
         }
     } catch (error) {
         console.error(error?.message ?? String(error));
         return EXIT.failure;
+    } finally {
+        if (proxy) await proxy.close();
     }
     return EXIT.ok;
 }
@@ -509,6 +531,178 @@ async function commandComplete(opts) {
 }
 
 /**
+ * The `services` command: the external services and their state.
+ *
+ * The list has three kinds of rows: this server (the file `serve.json` of the home
+ * directory), the other `ai-serve` instances of `config.json`, and the external MCP
+ * servers of `mcp.json`. The token is shortened in the text and whole in the JSON.
+ *
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandServices(opts) {
+    const action = opts.positionals[0] ?? 'list';
+    if (action === 'add') return await commandServicesAdd(opts);
+    if (action === 'add-mcp') return await commandServicesAddMcp(opts);
+    if (action === 'remove') return await commandServicesRemove(opts);
+    if (action !== 'list') return usage(`Unknown action of \`services\`: ${action}.`);
+
+    let config;
+    try {
+        config = await loadConfig({
+            configPath: opts.configPath,
+            cwd: opts.cwd ? path.resolve(opts.cwd) : process.cwd(),
+        });
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+
+    const home = config.home;
+    const rows = [];
+    const self = await readServeRecord(serveFile(home));
+    rows.push({
+        name: 'self',
+        kind: 'ai-serve',
+        status: self && pidAlive(self.pid) ? 'running' : 'stopped',
+        url: self?.url ?? null,
+        httpURL: self?.httpURL ?? null,
+        token: self?.token ?? null,
+        pid: self?.pid ?? null,
+    });
+    for (const service of await listServices(config.services)) {
+        rows.push({ name: service.name, kind: 'ai-serve', ...service });
+    }
+
+    let servers = [];
+    try {
+        servers = await readMcpFile(homeMcpFile(home));
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+    for (const [index, entry] of servers.entries()) {
+        let server;
+        try {
+            server = normalizeServer(entry, index);
+        } catch {
+            continue;
+        }
+        rows.push({
+            name: server.name,
+            kind: 'mcp',
+            status: server.enabled ? 'configured' : 'disabled',
+            transport: server.transport,
+            url: server.url,
+            command: server.command,
+            token: server.token,
+        });
+    }
+
+    if (opts.json) {
+        console.log(JSON.stringify(rows, null, 2));
+        return EXIT.ok;
+    }
+    console.log(`${'NAME'.padEnd(18)}${'KIND'.padEnd(10)}${'STATUS'.padEnd(12)}${'ADDRESS'.padEnd(32)}TOKEN`);
+    for (const row of rows) {
+        const address = row.url ?? row.command ?? '';
+        console.log(`${row.name.padEnd(18)}${row.kind.padEnd(10)}${row.status.padEnd(12)}${address.padEnd(32)}${maskToken(row.token)}`);
+    }
+    return EXIT.ok;
+}
+
+/**
+ * The `services add` action: a service of `config.json`.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandServicesAdd(opts) {
+    const name = opts.positionals[1];
+    if (!name) return usage('The action `services add` needs a name.');
+    if (!opts.url && !opts.serviceCommand) return usage('The action `services add` needs --url or --command.');
+    const entry = {
+        name,
+        ...(opts.url ? { url: opts.url } : {}),
+        ...(opts.serviceCommand ? { command: opts.serviceCommand, args: opts.args } : {}),
+        ...(opts.token ? { token: opts.token } : {}),
+    };
+    try {
+        await registerService(homeConfigFile(defaultHome(process.env)), entry);
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+    console.log(`Registered the service ${name}.`);
+    return EXIT.ok;
+}
+
+/**
+ * The `services add-mcp` action: an external MCP server of `mcp.json`.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandServicesAddMcp(opts) {
+    const name = opts.positionals[1];
+    if (!name) return usage('The action `services add-mcp` needs a name.');
+    if (!opts.url && !opts.serviceCommand) return usage('The action `services add-mcp` needs --url or --command.');
+    const entry = {
+        name,
+        ...(opts.url
+            ? { url: opts.url, ...(opts.token ? { token: opts.token } : {}) }
+            : { command: opts.serviceCommand, args: opts.args, ...(opts.token ? { token: opts.token } : {}) }),
+    };
+    try {
+        await registerMcpServer(homeMcpFile(defaultHome(process.env)), entry);
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+    console.log(`Registered the MCP server ${name}.`);
+    return EXIT.ok;
+}
+
+/**
+ * The `services remove` action: the service goes from both files.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandServicesRemove(opts) {
+    const name = opts.positionals[1];
+    if (!name) return usage('The action `services remove` needs a name.');
+    const home = defaultHome(process.env);
+    let removed = false;
+    try {
+        removed = await removeService(homeConfigFile(home), name);
+        removed = (await removeMcpServer(homeMcpFile(home), name)) || removed;
+    } catch (error) {
+        console.error(error?.message ?? String(error));
+        return EXIT.failure;
+    }
+    if (!removed) {
+        console.error(`There is no service named ${name}.`);
+        return EXIT.failure;
+    }
+    console.log(`Removed the service ${name}.`);
+    return EXIT.ok;
+}
+
+/**
+ * The token of a row, shortened for the text output.
+ * @param {string|null|undefined} token
+ * @returns {string}
+ * @ai.hint pure
+ */
+function maskToken(token) {
+    if (typeof token !== 'string' || !token) return '-';
+    if (token.length <= 6) return '…';
+    return `${token.slice(0, 3)}…${token.slice(-2)}`;
+}
+
+/**
  * Main entry point: parse the arguments and dispatch the command.
  * @param {string[]} argv
  * @returns {Promise<number>} the exit code
@@ -549,6 +743,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (opts.command === 'complete') {
         return await commandComplete(opts);
+    }
+    if (opts.command === 'services') {
+        return await commandServices(opts);
     }
     if (COMMAND_NAMES.includes(opts.command)) {
         return pending(opts.command);

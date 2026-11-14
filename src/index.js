@@ -217,6 +217,13 @@ export {
     proxyToolDefinition,
     connectServer,
     connectServers,
+    createToolProxy,
+    normalizeService,
+    startServiceProcess,
+    connectBus,
+    connectService,
+    listServices,
+    httpUrlOf,
 } from './client/proxy.js';
 
 export {

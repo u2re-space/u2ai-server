@@ -101,6 +101,9 @@ function validateMcpServer(server, where, fail) {
 
 /**
  * Validate one external service entry: another `ai-serve` we talk to.
+ *
+ * The service is either running somewhere else (`url`) or is started by us
+ * (`command`); a service may also name the file with its address (`file`).
  * @param {unknown} service
  * @param {string} where
  * @param {(message: string) => never} fail
@@ -108,8 +111,17 @@ function validateMcpServer(server, where, fail) {
 function validateService(service, where, fail) {
   if (!isRecord(service)) fail(`${where}: объект`);
   if (typeof service.name !== 'string' || !service.name.trim()) fail(`${where}.name: непустая строка`);
-  if (typeof service.url !== 'string' || !service.url.trim()) fail(`${where}.url: непустая строка`);
+  const hasUrl = typeof service.url === 'string' && service.url.trim();
+  const hasCommand = typeof service.command === 'string' && service.command.trim();
+  const hasFile = typeof service.file === 'string' && service.file.trim();
+  if (service.url != null && !hasUrl) fail(`${where}.url: непустая строка`);
+  if (service.command != null && !hasCommand) fail(`${where}.command: непустая строка`);
+  if (!hasUrl && !hasCommand && !hasFile) fail(`${where}: нужен url, command или file`);
   if (service.token != null && typeof service.token !== 'string') fail(`${where}.token: строка или null`);
+  if (service.args != null && !Array.isArray(service.args)) fail(`${where}.args: массив строк или null`);
+  if (service.cwd != null && typeof service.cwd !== 'string') fail(`${where}.cwd: строка или null`);
+  if (service.file != null && typeof service.file !== 'string') fail(`${where}.file: строка или null`);
+  if (service.enabled != null && typeof service.enabled !== 'boolean') fail(`${where}.enabled: true | false`);
 }
 
 /**

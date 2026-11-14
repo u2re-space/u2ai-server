@@ -162,3 +162,72 @@ export async function writeMcpFile(file, servers) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify({ servers }, null, 2)}\n`, 'utf8');
 }
+
+/**
+ * Add a service to the config file, or replace the one with the same name.
+ *
+ * The file keeps everything else it holds: only the list of the services changes.
+ *
+ * @param {string} file
+ * @param {object} entry the service: { name, url?, command?, token?, args? }
+ * @returns {Promise<object>} the entry that was written
+ */
+export async function registerService(file, entry) {
+  if (!isRecord(entry) || typeof entry.name !== 'string' || !entry.name.trim()) {
+    throw new Error('A service needs a name.');
+  }
+  const config = await readConfigFile(file, { optional: true });
+  const services = Array.isArray(config.services) ? [...config.services] : [];
+  const index = services.findIndex((item) => isRecord(item) && item.name === entry.name);
+  if (index >= 0) services[index] = entry;
+  else services.push(entry);
+  await writeConfigFile(file, { ...config, services });
+  return entry;
+}
+
+/**
+ * Remove a service from the config file.
+ * @param {string} file
+ * @param {string} name
+ * @returns {Promise<boolean>} true when the file was changed
+ */
+export async function removeService(file, name) {
+  const config = await readConfigFile(file, { optional: true });
+  const services = Array.isArray(config.services) ? config.services : [];
+  const next = services.filter((item) => !(isRecord(item) && item.name === name));
+  if (next.length === services.length) return false;
+  await writeConfigFile(file, { ...config, services: next });
+  return true;
+}
+
+/**
+ * Add an external MCP server to the file, or replace the one with the same name.
+ * @param {string} file
+ * @param {object} entry the server: { name, url?, command?, args?, token? }
+ * @returns {Promise<object>} the entry that was written
+ */
+export async function registerMcpServer(file, entry) {
+  if (!isRecord(entry) || typeof entry.name !== 'string' || !entry.name.trim()) {
+    throw new Error('An MCP server needs a name.');
+  }
+  const servers = await readMcpFile(file);
+  const index = servers.findIndex((item) => isRecord(item) && item.name === entry.name);
+  if (index >= 0) servers[index] = entry;
+  else servers.push(entry);
+  await writeMcpFile(file, servers);
+  return entry;
+}
+
+/**
+ * Remove an external MCP server from the file.
+ * @param {string} file
+ * @param {string} name
+ * @returns {Promise<boolean>} true when the file was changed
+ */
+export async function removeMcpServer(file, name) {
+  const servers = await readMcpFile(file);
+  const next = servers.filter((item) => !(isRecord(item) && item.name === name));
+  if (next.length === servers.length) return false;
+  await writeMcpFile(file, next);
+  return true;
+}
