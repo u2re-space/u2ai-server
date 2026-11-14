@@ -1,0 +1,46 @@
+{
+  "name": "@u2ai/server",
+  "version": "0.3.0-alpha",
+  "description": "Agent service and server: an MCP server with tools, a bus for editor extensions, and a completion bridge.",
+  "type": "module",
+  "main": "./index.js",
+  "bin": {
+    "ai-serve": "./bin/ai-serve.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/u2re-space/u2ai-server.git"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "start": "node bin/ai-serve.js",
+    "test": "node --test --test-timeout=60000 \"test/*.test.js\"",
+    "test:network": "node --test --test-timeout=120000 \"test/network.test.js\"",
+    "check": "node scripts/check-syntax.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "index.js",
+    "README.md"
+  ],
+  "keywords": [
+    "openai",
+    "responses-api",
+    "cli",
+    "mcp",
+    "model-context-protocol",
+    "websocket",
+    "agent",
+    "autocomplete"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.1"
+  }
+}
