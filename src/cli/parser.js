@@ -52,8 +52,11 @@ export function parseArgv(argv) {
 
     const positionals = [...parsed.positionals];
     let command = 'serve';
-    if (positionals.length && COMMAND_NAMES.includes(positionals[0])) {
-        command = positionals.shift();
+    if (positionals.length) {
+        // The first positional is the command when it names one; an unknown name is
+        // kept, so the dispatcher answers with a clear error instead of starting the
+        // default command.
+        command = COMMAND_NAMES.includes(positionals[0]) ? positionals.shift() : positionals[0];
     }
 
     return {

@@ -10,6 +10,7 @@ export { parseArgv } from './cli/parser.js';
 export { HELP, COMMAND_NAMES } from './help.js';
 export { COLORS, paint } from './cli/colors.js';
 export { checkNodeVersion, REQUIRED_NODE } from './cli/compatibility.js';
+export { runDoctor, formatDoctor, CHECK_STATES } from './cli/doctor.js';
 
 export * from './config.js';
 

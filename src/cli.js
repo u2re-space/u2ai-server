@@ -2,7 +2,7 @@
  * @file src/cli.js
  * @module cli
  * @purpose Parse argv, dispatch the commands, and map the failures to the exit codes.
- * @depends node:module, cli/parser, cli/compatibility, config, help
+ * @depends node:module, cli/parser, cli/compatibility, cli/doctor, config, help
  * @exports EXIT, main
  * @ai.tags cli, dispatch
  * @ai.hint keep
@@ -14,6 +14,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
+import { runDoctor, formatDoctor } from './cli/doctor.js';
 import { loadConfig, redactConfig } from './config.js';
 import { readMcpFile, registerService, removeService, registerMcpServer, removeMcpServer } from './config/parser.js';
 import { defaultHome, homeConfigFile, homeMcpFile, serveFile } from './config/paths.js';
@@ -429,6 +430,32 @@ function printRoleResult(role, out, asJson) {
 }
 
 /**
+ * The `doctor` command: the check of the environment.
+ *
+ * The report is a list of checks: the Node.js, the home directory, the
+ * configuration, the key of the model, the port and the external services. The
+ * command fails when a check failed.
+ *
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandDoctor(opts) {
+    const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
+    const report = await runDoctor({
+        cwd,
+        configPath: opts.configPath,
+        port: opts.port != null && String(opts.port).trim() !== '' ? Number(opts.port) : null,
+    });
+    if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+    } else {
+        console.log(formatDoctor(report.checks));
+    }
+    return report.ok ? EXIT.ok : EXIT.failure;
+}
+
+/**
  * The `tools` command: the tools of the package, with their category and their risk.
  *
  * The list is the one of the configuration: a tool that the configuration forbids is not
@@ -746,6 +773,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (opts.command === 'services') {
         return await commandServices(opts);
+    }
+    if (opts.command === 'doctor') {
+        return await commandDoctor(opts);
     }
     if (COMMAND_NAMES.includes(opts.command)) {
         return pending(opts.command);

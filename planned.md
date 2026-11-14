@@ -1,6 +1,6 @@
 # План перехода: Universal-AI (монолит 0.2.xx) → @u2ai/server (0.3.xx)
 
-> Актуальный статус: **шаг 17 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита).
+> Актуальный статус: **шаг 18 из 19 выполнен** (каркас, конфиг, OpenAI-слой, протокол, WebSocket-сервер, хаб шины, инструменты файловой системы, терминал, контекст и сканирование workspace, MCP-сервер, MCP-клиент, роли и серверный агент, Tab-autocomplete с HTTP- и WebSocket-мостом, обработка инструментов в шине, HTTP-API для расширений, внешние AI-сервисы и утилиты, мост из монолита, тесты).
 > Рабочий дом переносимого кода: `submodules/u2ai-server/`.
 > Репозиторий: <https://github.com/u2re-space/u2ai-server> (remote настроен, пуш не делаем).
 >
@@ -282,12 +282,18 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] Проверка: монолитный `ai serve` и `ai-serve serve` не конфликтуют по порту
 
 ### step-18 — Тесты
-- [ ] `test/config.test.js` — конфиг, валидация, русские сообщения
-- [ ] `test/protocol.test.js`, `test/hub.test.js`, `test/serve.test.js` — шина и запуск
-- [ ] `test/filesystem.test.js`, `test/terminal.test.js`, `test/context.test.js` — инструменты
-- [ ] `test/mcp.test.js`, `test/mcp-client.test.js` — MCP в обе стороны
-- [ ] `test/http.test.js`, `test/autocomplete.test.js`, `test/processing.test.js` — HTTP, дополнение, обработка
-- [ ] `test/roles.test.js` — роли и агентный цикл
+- [x] `test/config.test.js` — конфиг, валидация, русские сообщения
+- [x] `test/protocol.test.js`, `test/hub.test.js`, `test/serve.test.js` — шина и запуск
+- [x] `test/filesystem.test.js`, `test/terminal.test.js`, `test/context.test.js` — инструменты
+- [x] `test/mcp.test.js`, `test/mcp-client.test.js` — MCP в обе стороны
+- [x] `test/http.test.js`, `test/autocomplete.test.js`, `test/processing.test.js` — HTTP, дополнение, обработка
+- [x] `test/roles.test.js` — роли и агентный цикл
+- [x] `test/openai.test.js` — слой OpenAI: Responses, Chat Completions, откат, поток
+- [x] `test/services.test.js` — внешние сервисы и MCP-прокси
+- [x] `test/cli.test.js` — CLI: помощь, версия, инструменты, конфиг, ошибки
+- [x] `src/cli/doctor.js` — команда `doctor`: Node, домашний каталог, конфиг, ключ, порт, сервисы
+- [x] `src/cli/parser.js` — неизвестная команда даёт ошибку, а не запускает сервер по умолчанию
+- [x] `npm test` — 389 тестов: 388 проходят, 1 пропущен, 0 падений
 
 ### step-19 — README и релиз-чеклист
 - [ ] `README.md` — установка, команды, конфиг, протокол `ai-serve`, MCP, примеры
