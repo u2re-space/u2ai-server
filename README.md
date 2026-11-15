@@ -128,6 +128,44 @@ The order of the sources: the defaults, then `~/.ai-serve/config.json`, then the
 The strings of the configuration understand the placeholders `{{env:NAME}}` and
 `{{file:path}}`.
 
+### The models of the house
+
+The profiles of the text models are tuned by the cards of the gateway (RouterAI, November 2026)
+and by the live answers of it. The window and the output cap of the house are the same for every
+model — the context of the agent is bounded by the service, not by the card of the model:
+
+| Model | Window | Output | Ceiling | Ladder |
+|---|---|---|---|---|
+| `minimax/minimax-m3.1-flash` | 256K | 32K | `high` | `low`, `medium`, `high` |
+| `google/gemini-4-hydrogen` | 256K | 32K | `xhigh` | `low`, `medium`, `high`, `xhigh` |
+| `moonshotai/kimi-k3.1-pro` | 256K | 32K | `medium` | `none`, `low`, `medium` |
+
+The Gemini 4 Hydrogen is the alternative to the Kimi: it takes the effort up to `xhigh`, so a
+role that has to think hard is not cut short. The card of the vendor names the four levels of
+its effort and has no `none`, so the reasoning off is raised to `low`. The Kimi K3.1 Pro takes
+the reasoning off without a refusal and answers in a fraction of the time, so `none` stays on
+its ladder — the levels above `medium` cost the same seconds, and `medium` is its ceiling.
+
+When a model refuses, the next one of the chain answers instead. The chain of the house is the
+Kimi: it is the fallback of the Gemini and of every other model — the two never stand in the
+same chain.
+
+```json
+{
+  "fallback": {
+    "enabled": true,
+    "models": {
+      "google/gemini-4-hydrogen": ["moonshotai/kimi-k3.1-pro", "moonshotai/kimi-k3", "openai/gpt-5.1"],
+      "minimax/minimax-m3.1-flash": ["moonshotai/kimi-k3.1-pro", "moonshotai/kimi-k3", "openai/gpt-5.1"],
+      "*": ["moonshotai/kimi-k3.1-pro", "moonshotai/kimi-k3", "openai/gpt-5.1"]
+    }
+  }
+}
+```
+
+The key `*` is the chain of every model that has no chain of its own. `fallback.enabled: false`
+turns the chain off.
+
 ### The environment
 
 | Name | What it sets |

@@ -41,6 +41,7 @@ import { resolveBackends } from '../src/openai/client.js';
 import { buildDecisionBody, parseDecisionAnswer, validateDecisionQuestions } from '../src/openai/decision.js';
 import { buildBatchJsonl, parseBatchResults, batchEndpointFor } from '../src/openai/batch.js';
 import { getModelProfile, snapEffort, contextBytes, maxOutputFor } from '../src/model/profiles.js';
+import { defaults } from '../src/config/defaults.js';
 
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -352,4 +353,36 @@ test('the context budget of a level is read', () => {
 
 test('the output cap never exceeds the cap of the model', () => {
     assert.equal(maxOutputFor('minimax/minimax-m3.1-flash', null, 1_000_000), 32_768);
+});
+
+test('the Gemini is the alternative to the Kimi and the Kimi is the fallback', () => {
+    const gemini = getModelProfile('google/gemini-4-hydrogen');
+    assert.equal(gemini.ceiling, 'xhigh');
+    assert.deepEqual(gemini.efforts, ['low', 'medium', 'high', 'xhigh']);
+    assert.equal(snapEffort('none', gemini), 'low', 'the card of the vendor has no none');
+    assert.equal(snapEffort('xhigh', gemini), 'xhigh');
+
+    // The Kimi is tuned for the speed of the answer: the ceiling is `medium`.
+    const kimi = getModelProfile('moonshotai/kimi-k3.1-pro');
+    assert.equal(kimi.ceiling, 'medium');
+    assert.equal(snapEffort('high', kimi), 'medium');
+    assert.equal(snapEffort('none', kimi), 'none', 'the reasoning may be turned off');
+});
+
+test('the chain of the house starts with the Kimi', () => {
+    // The Gemini is the alternative, the Kimi answers when it refuses.
+    assert.deepEqual(
+        fallbackChain(defaults, 'google/gemini-4-hydrogen'),
+        [
+            'google/gemini-4-hydrogen',
+            'moonshotai/kimi-k3.1-pro',
+            'moonshotai/kimi-k3',
+            'openai/gpt-5.1',
+        ],
+    );
+    // Every other model falls back to the Kimi too.
+    assert.deepEqual(
+        fallbackChain(defaults, 'vendor/other'),
+        ['vendor/other', 'moonshotai/kimi-k3.1-pro', 'moonshotai/kimi-k3', 'openai/gpt-5.1'],
+    );
 });

@@ -18,12 +18,22 @@ import { ENUMS } from '../config/constants.js';
 /**
  * Built-in model profiles. A ceiling of `null` means "no built-in limit".
  *
- * The server answers with a light model: the tools do the work, the model plans it.
+ * The server answers with a light model: the tools do the work, the model plans it. The window
+ * and the output cap of the house are the same for every model — the context of the agent is
+ * bounded by the service, not by the card of the model. The ceiling of the effort and the ladder
+ * of the levels are the ones of the model (the cards of RouterAI, November 2026):
+ *
+ *   - Gemini 4 Hydrogen — the levels of the effort are `low`, `medium`, `high` and `xhigh`;
+ *     there is no `none`, so the reasoning off is raised to `low`.
+ *   - Kimi K3.1 Pro — it takes the reasoning off without a refusal and answers in a fraction of
+ *     the time, so `none` stays on its ladder; the ceiling is `medium`, because the levels above
+ *     it cost the same seconds. The model is the fallback of the house.
  */
 export const MODEL_PROFILES = Object.freeze({
     'minimax/minimax-m3.1-flash': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
+    'google/gemini-4-hydrogen': { window: 262_144, maxOutput: 32_768, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'] },
     'moonshotai/kimi-k3': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
-    'moonshotai/kimi-k3.1-pro': { window: 262_144, maxOutput: 32_768, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    'moonshotai/kimi-k3.1-pro': { window: 262_144, maxOutput: 32_768, ceiling: 'medium', efforts: ['none', 'low', 'medium'] },
     'openai/gpt-5.1': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
     'openai/gpt-6.1-sol': { window: 262_144, maxOutput: 32_768, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'] },
     'openai/gpt-6.1-terra': { window: 262_144, maxOutput: 16_384, ceiling: 'high', efforts: ['low', 'medium', 'high'] },

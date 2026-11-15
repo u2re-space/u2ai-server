@@ -412,6 +412,25 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] Проверка: `test/filesystem.test.js` (поиск по именам, маска), `npm test` — 442 теста,
       все проходят
 
+### step-B4 — Gemini 4 Hydrogen вместо kimi, kimi — как fallback
+- [x] Повод: карточка модели `google/gemini-4-hydrogen` на RouterAI (ноябрь 2026) — уровни
+      усилия `low|medium|high|xhigh`, окно 1M токенов и до 1M токенов выхода с продолжением.
+      Kimi становится моделью-фолбэком, Gemini — основной альтернативой
+- [x] Живые пробы шлюза (2026-11-15): `POST /v1/responses` с `text.format` (json_schema) → 200 и
+      ответ по схеме; с инструментом → 200 и `function_call`; с `reasoning.effort=xhigh` → 200 и
+      305 reasoning-токенов; `POST /v1/chat/completions` с `response_format` → 200 и ответ по
+      схеме ⇒ Gemini работает и в Responses, и в Chat Completions
+- [x] `src/model/profiles.js` — профиль `google/gemini-4-hydrogen`: окно 262 144 байта, выход
+      32 768, потолок `xhigh`, лестница `low|medium|high|xhigh` (уровня `none` у карточки нет —
+      запрос поднимается до `low`); профиль kimi-k3.1-pro приведён к реальному: потолок
+      `medium`, лестница `none|low|medium` (под скорость ответа)
+- [x] `src/config/defaults.js` — цепочка фолбэков: у Gemini и у minimax первым идёт
+      `moonshotai/kimi-k3.1-pro`, в общей цепочке `*` — тоже первым; модель по умолчанию
+      остаётся `minimax/minimax-m3.1-flash`
+- [x] `test/openai.test.js` — профиль Gemini, срез усилия, цепочка дома
+- [x] README (EN): таблица моделей, цепочка фолбэков
+- [x] Проверка: `npm test` — 444 теста, 443 проходят, 1 пропущен (Windows: нет прав на файлы)
+
 ---
 
 ## 4. Правила работы

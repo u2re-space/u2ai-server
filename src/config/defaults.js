@@ -52,12 +52,17 @@ export const defaults = {
    * Model fallback: when a model fails, the next one of the chain answers instead.
    * `models` maps a model to the models to try after it; the key `*` is the chain for every
    * other model.
+   *
+   * The chain of the house is the Kimi: it answers with the reasoning off in a fraction of the
+   * time, so a run that met a refusal keeps going. The Kimi is the fallback of the Gemini and
+   * of every other model — the two never stand in the same chain.
    */
   fallback: {
     enabled: true,
     models: {
-      'minimax/minimax-m3.1-flash': ['moonshotai/kimi-k3', 'openai/gpt-5.1'],
-      '*': ['moonshotai/kimi-k3', 'openai/gpt-5.1'],
+      'google/gemini-4-hydrogen': ['moonshotai/kimi-k3.1-pro', 'moonshotai/kimi-k3', 'openai/gpt-5.1'],
+      'minimax/minimax-m3.1-flash': ['moonshotai/kimi-k3.1-pro', 'moonshotai/kimi-k3', 'openai/gpt-5.1'],
+      '*': ['moonshotai/kimi-k3.1-pro', 'moonshotai/kimi-k3', 'openai/gpt-5.1'],
     },
   },
 
