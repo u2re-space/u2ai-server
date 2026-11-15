@@ -74,7 +74,13 @@ moves it):
 | `~/.ai-serve/mcp.json` | The outside MCP servers. |
 | `~/.ai-serve/skills/` | The skill packs of the roles. |
 | `~/.ai-serve/logs/` | The logs. |
+| `~/.ai-serve/tmp/` | The state of the runs: one directory per run. |
 | `~/.ai-serve/serve.json` | The address of the running server. Written by the server, mode `0600`, removed when the server stops. |
+
+The layout of the home is described in one place — `homeLayout()` in `src/config/paths.js` — and
+every path of it has its own function: `homeConfigFile`, `homeMcpFile`, `homeSkillsDir`,
+`homeLogsDir`, `homeTmpDir`, `homeRunDir`, `serveFile`. Nothing guesses where a file of the
+service lies.
 
 ### The contract of `serve.json`
 
@@ -94,6 +100,58 @@ the new ones name the parts of the server:
 | `mcp` | The endpoint of the MCP server: `<httpURL>/mcp`, or `null` when there is none. |
 | `protocol` | The version of the protocol of the bus. |
 | `startedAt` | When the server started. |
+
+---
+
+## The house of the project
+
+The home of the service is the state of the service. The house of a project is the state of the
+work: every project has one directory of its own, `.ai/`, and everything a run makes that is not
+the product itself lives there, and nowhere else.
+
+```
+.ai/
+  tmp/<run-id>/     the state of the run: what it was, what it changed
+  assets/           the assets of the house
+  logs/             the logs of the house
+  manifest.json     the contract of the project: what every system made and where it lies
+```
+
+The state of a run dies with the run: a new run never reads the state of the old one. The
+`ai-serve agent` command and every run of the bus leave the state of the run in
+`.ai/tmp/<run-id>/run.json`.
+
+The product stays where the user expects it — the files the agent writes stay in the project —
+and the house keeps the state and the contract.
+
+The contract is how the systems of the house find each other: the webdev, the measurer, the
+decomposer, the images and the server sign the same file, and every system owns its own part of
+it. The server signs the files its run wrote:
+
+```json
+{
+  "manifestVersion": 1,
+  "updatedAt": "2026-11-15T03:41:02.113Z",
+  "systems": {
+    "server": {
+      "delivery": ".",
+      "artifacts": {
+        "changes": ["src/app.js", "README.md"]
+      },
+      "updatedAt": "2026-11-15T03:40:58.002Z"
+    }
+  }
+}
+```
+
+The paths are relative to the project and with forward slashes: the contract is read on another
+machine and another system, and the path has to mean the same thing there. A system that cannot
+sign the contract warns and goes on — the contract is a hint, not a reason to fail.
+
+The files of the house are written whole: the bytes go to a file next to the target and the
+target is replaced by a rename. A reader never sees half of a file, and a run that dies in the
+middle leaves the old file and not a broken one. The write of the tools and the write of the
+access layer are atomic too.
 
 ---
 

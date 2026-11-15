@@ -3,7 +3,7 @@
  * @module config
  * @purpose Public face of the configuration system implemented in src/config/*.js.
  * @depends config/index, config/constants, config/defaults, config/env, config/merge, config/parser, config/paths, config/validate
- * @exports loadConfig, ensureConfigFile, redactConfig, applyOverrides, defaults, cloneDefaults, defaultConfigText, ENUMS, KiB, MiB, ENV_PREFIX, fromEnv, envConfigPath, deepMerge, isRecord, getPath, setPath, readConfigFile, writeConfigFile, readMcpFile, writeMcpFile, registerService, removeService, registerMcpServer, removeMcpServer, expandPlaceholders, mergeSources, defaultHome, homeConfigFile, homeMcpFile, homeSkillsDir, homeLogsDir, serveFile, resolveConfigPath, ensureHomeDir, validateConfig
+ * @exports loadConfig, ensureConfigFile, redactConfig, applyOverrides, defaults, cloneDefaults, defaultConfigText, ENUMS, KiB, MiB, ENV_PREFIX, fromEnv, envConfigPath, deepMerge, isRecord, getPath, setPath, readConfigFile, writeConfigFile, readMcpFile, writeMcpFile, registerService, removeService, registerMcpServer, removeMcpServer, expandPlaceholders, mergeSources, defaultHome, homeConfigFile, homeMcpFile, homeSkillsDir, homeLogsDir, serveFile, homeTmpDir, homeRunDir, homeLayout, resolveConfigPath, ensureHomeDir, validateConfig
  * @ai.tags config
  * @ai.hint keep
  */
@@ -38,6 +38,9 @@ export {
   homeSkillsDir,
   homeLogsDir,
   serveFile,
+  homeTmpDir,
+  homeRunDir,
+  homeLayout,
   resolveConfigPath,
   ensureHomeDir,
 } from './config/paths.js';

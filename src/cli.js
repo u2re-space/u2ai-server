@@ -11,7 +11,7 @@
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
 import { runDoctor, formatDoctor } from './cli/doctor.js';
@@ -19,6 +19,7 @@ import { loadConfig, redactConfig } from './config.js';
 import { readMcpFile, registerService, removeService, registerMcpServer, removeMcpServer } from './config/parser.js';
 import { defaultHome, homeConfigFile, homeMcpFile, serveFile } from './config/paths.js';
 import { startServe, readServeRecord, pidAlive } from './server/serve.js';
+import { signRun } from './server/publish.js';
 import { createHub } from './server/u2ai.js';
 import { createServerAgent } from './server/agent.js';
 import { createMcpServer, startHttpServer, newMcpToken } from './server/mcp.js';
@@ -330,6 +331,11 @@ async function commandAgent(opts) {
         return usage(`There is no role named ${role}. The roles are: ${ROLE_NAMES.join(', ')}.`);
     }
 
+    // The run of the agent: its id names the directory of its state in the house.
+    const runId = randomUUID();
+    const changes = [];
+    let status = 'failed';
+
     const onEvent = opts.verbose
         ? (event) => console.error(`[${event?.type ?? 'event'}] ${event?.error ?? event?.backend ?? ''}`)
         : null;
@@ -367,6 +373,7 @@ async function commandAgent(opts) {
                 model: opts.model ?? null,
                 proxy,
             });
+            if (Array.isArray(out.execution?.changes)) changes.push(...out.execution.changes);
             printAgentResult(out, opts.json);
         } else {
             const out = await runRole(role, {
@@ -377,12 +384,20 @@ async function commandAgent(opts) {
                 model: opts.model ?? null,
                 proxy,
             });
+            if (Array.isArray(out?.changes)) changes.push(...out.changes);
             printRoleResult(role, out, opts.json);
         }
+        status = 'completed';
     } catch (error) {
         console.error(error?.message ?? String(error));
         return EXIT.failure;
     } finally {
+        // The house of the project: the state of the run and the files it wrote.
+        const signed = await signRun(cwd, runId, {
+            changes,
+            state: { command: 'agent', role, status, finishedAt: new Date().toISOString() },
+        });
+        if (!signed.ok) console.error(`The contract of the project is not signed: ${signed.error}`);
         if (proxy) await proxy.close();
     }
     return EXIT.ok;

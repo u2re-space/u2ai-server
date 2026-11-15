@@ -431,6 +431,29 @@ src/tools/     cache.js context.js filesystem.js suggest.js terminal.js tools.js
 - [x] README (EN): таблица моделей, цепочка фолбэков
 - [x] Проверка: `npm test` — 444 теста, 443 проходят, 1 пропущен (Windows: нет прав на файлы)
 
+### step-B5 — Закон дома: `.ai/` в проекте, один layout дома сервиса
+- [x] `src/shared/house.js` — копия эталона `u2ai-webdev/src/shared/house.js`, побайтово такая же:
+      SHA-256 `AF5BA37A…0B998` во всех пяти пакетах дома (webdev, measurer, decomposer, images, server)
+- [x] `src/config/paths.js` — один layout дома сервиса: `homeLayout()` описывает его целиком,
+      `homeTmpDir()` и `homeRunDir()` — состояние прогонов; `~/.ai-serve` не переезжает, имена
+      `config.json`, `mcp.json`, `serve.json` сохраняются
+- [x] `src/server/publish.js` — секция `server` контракта проекта: `changesRel()` (пути
+      относительно корня, со слешами, без повторов), `publishServer()`, `writeRunState()`
+      (`.ai/tmp/<run-id>/run.json`), `signRun()` — ошибка подписи это предупреждение, не падение
+- [x] `src/server/agent.js` — прогон шины собирает изменения инструментов и подписывает дом:
+      состояние прогона и контракт проекта
+- [x] `src/cli.js` — команда `agent` подписывает дом своего прогона
+- [x] `src/access/fs.js` — копия эталона `u2ai-webdev` (отличается только строкой `@usedBy`):
+      атомарная запись через временный файл и rename
+- [x] `src/tools/filesystem.js` — `writeTextFile()` и `replaceInFile()` пишут атомарно
+- [x] `src/index.js` — публичные экспорты закона дома и подписи прогона
+- [x] `test/house.test.js` — 14 тестов: дом, состояние прогона, контракт, layout дома сервиса,
+      атомарная запись слоя доступа и инструментов
+- [x] `test/agent.test.js` — прогон подписывает дом; корень тестов — временный каталог
+- [x] README (EN) — раздел «The house of the project», layout дома сервиса; planned.md (RU)
+- [x] Проверка: `npm run check` — 94 файла разобраны, `npm test` — 459 тестов, 458 проходят,
+      1 пропущен (Windows: нет прав на файлы), 0 падений
+
 ---
 
 ## 4. Правила работы

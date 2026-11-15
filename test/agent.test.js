@@ -6,12 +6,23 @@
  */
 
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 import { createServerAgent } from '../src/server/agent.js';
 import { createHub } from '../src/server/u2ai.js';
 
 const TOKEN = 'secret-token';
+
+// The runs sign the house of the project: the root of the tests is a temporary directory,
+// and the package directory stays clean.
+const ROOT = await mkdtemp(path.join(os.tmpdir(), 'ai-serve-agent-'));
+
+after(async () => {
+    await rm(ROOT, { recursive: true, force: true });
+});
 
 /**
  * A response of the model in the shape of the Responses API.
@@ -164,7 +175,7 @@ function eventsOf(hub, type) {
 test('the agent answers a question and finishes the run', async () => {
     const hub = fakeHub();
     const client = fakeClient([answerOf('the answer')]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf();
     await agent.start(run, frame);
 
@@ -178,7 +189,7 @@ test('the agent answers a question and finishes the run', async () => {
 test('the question of a client asks the model without the tools', async () => {
     const hub = fakeHub();
     const client = fakeClient([answerOf('the answer')]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf();
     await agent.start(run, frame);
 
@@ -194,7 +205,7 @@ test('the tools of the run go through the hub', async () => {
         rawWithCalls('', [{ name: 'read_file', arguments: { path: 'notes.md' } }]),
         answerOf('the file says hello'),
     ]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf({ command: 'run', prompt: 'read the file' });
     await agent.start(run, frame);
 
@@ -214,7 +225,7 @@ test('the answer of a tool goes back to the model', async () => {
         rawWithCalls('', [{ name: 'read_file', arguments: { path: 'notes.md' } }]),
         answerOf('done'),
     ]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf({ command: 'run', prompt: 'read the file' });
     await agent.start(run, frame);
 
@@ -227,7 +238,7 @@ test('the answer of a tool goes back to the model', async () => {
 test('a client may ask for no tools at all', async () => {
     const hub = fakeHub();
     const client = fakeClient([answerOf('the answer')]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf({ command: 'run', prompt: 'the task', noTools: true });
     await agent.start(run, frame);
 
@@ -238,7 +249,7 @@ test('a client may ask for no tools at all', async () => {
 test('the pictures are refused with a clear warning', async () => {
     const hub = fakeHub();
     const client = fakeClient([answerOf('never used')]);
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf({ command: 'image', prompt: 'a cat' });
     await agent.start(run, frame);
 
@@ -255,7 +266,7 @@ test('a failure of the model is an event, not a crash', async () => {
             async create() { throw new Error('the host is down'); },
         },
     };
-    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
     const { run, frame } = runOf();
     await agent.start(run, frame);
 
@@ -271,7 +282,7 @@ test('the agent answers the runs of the clients of the bus', async () => {
         token: TOKEN,
         onStart: (run, frame) => agent.start(run, frame),
     });
-    agent = createServerAgent({ hub, config: { model: 'test-model' }, client });
+    agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
 
     const frames = [];
     const socket = hub.connect({ send: (frame) => frames.push(frame), close: () => {} });
@@ -284,4 +295,24 @@ test('the agent answers the runs of the clients of the bus', async () => {
     assert.ok(events.some((event) => event.type === 'response.done'));
     const ended = frames.find((frame) => frame.type === 'run.ended');
     assert.equal(ended.status, 'completed');
+});
+
+test('the run signs the house of the project: the state and the contract', async () => {
+    const hub = fakeHub({
+        answers: [{ output: 'written', summary: 'wrote 1 file', changes: [{ op: 'create', path: 'notes.md' }] }],
+    });
+    const client = fakeClient([
+        rawWithCalls('', [{ name: 'write_file', arguments: { path: 'notes.md' } }]),
+        answerOf('the file is written'),
+    ]);
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
+    const { run, frame } = runOf({ command: 'run', prompt: 'write the file' });
+    await agent.start(run, frame);
+
+    const state = JSON.parse(await readFile(path.join(ROOT, '.ai', 'tmp', 'run-1', 'run.json'), 'utf8'));
+    assert.equal(state.status, 'completed');
+    assert.deepEqual(state.changes, ['notes.md']);
+
+    const manifest = JSON.parse(await readFile(path.join(ROOT, '.ai', 'manifest.json'), 'utf8'));
+    assert.deepEqual(manifest.systems.server.artifacts.changes, ['notes.md']);
 });

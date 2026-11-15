@@ -22,7 +22,6 @@
 import path from 'node:path';
 import {
     readFile,
-    writeFile,
     mkdir,
     stat,
     readdir,
@@ -33,6 +32,7 @@ import {
 import { resolveInside, isForbiddenDirName, isProtectedFileName, NOISY_DIRS } from '../agent/access.js';
 import { createAccess } from '../access/index.js';
 import { formatBytes } from '../shared/format.js';
+import { writeFileAtomic } from '../shared/house.js';
 
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 
@@ -282,6 +282,10 @@ export async function searchFiles({
 
 /**
  * Create or overwrite a UTF-8 file, keeping the old bytes in the backup directory.
+ *
+ * The write is atomic: the bytes go to a file next to the target and the target is replaced
+ * by a rename. A reader never sees half of a file, and a run that dies in the middle leaves
+ * the old file and not a broken one.
  * @param {{ root: string, file: string, content: string, overwrite?: boolean, maxBytes?: number,
  *           backupDir?: string|null }} options
  * @returns {Promise<{ rel: string, bytes: number, created: boolean, backupPath: string|null }>}
@@ -304,8 +308,7 @@ export async function writeTextFile({
     if (existing && !overwrite) throw new Error(`The file already exists: ${rel} (overwrite=false).`);
     let backupPath = null;
     if (existing?.isFile()) backupPath = await backup(abs, rel, backupDir);
-    await mkdir(path.dirname(abs), { recursive: true });
-    await writeFile(abs, content, 'utf8');
+    await writeFileAtomic(abs, content);
     return { rel, bytes: Buffer.byteLength(content), created: !existing, backupPath };
 }
 
@@ -349,7 +352,7 @@ export async function replaceInFile({
     if (count > 1 && !all) throw new Error(`The fragment occurs ${count} times; narrow the context or set all=true.`);
     const updated = all ? text.split(search).join(replacement) : text.replace(search, () => replacement);
     const backupPath = await backup(abs, rel, backupDir);
-    await writeFile(abs, updated, 'utf8');
+    await writeFileAtomic(abs, updated);
     return { rel, replacements: all ? count : 1, bytes: Buffer.byteLength(updated), backupPath };
 }
 

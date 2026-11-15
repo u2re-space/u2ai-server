@@ -61,6 +61,7 @@ Options:
   -h, --help           Print this text.
   -v, --version        Print the version.
 
-The home directory is ~/.ai-serve: config.json, mcp.json, skills/, logs/.
+The home directory is ~/.ai-serve: config.json, mcp.json, skills/, logs/, tmp/.
+The house of a project is .ai/: tmp/, assets/, logs/, manifest.json.
 The environment prefix is AI_SERVE_*; OPENAI_* and AI_MODEL are read as well.
 `;

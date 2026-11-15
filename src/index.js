@@ -123,6 +123,36 @@ export { SERVE_FILE_MODE, pidAlive, readServeRecord, writeServeRecord, startServ
 export { createHub, attachConnection, attachCompletionSocket } from './server/u2ai.js';
 export { createServerAgent, AGENT_COMMANDS, AGENT_INSTRUCTIONS } from './server/agent.js';
 export {
+    RUN_STATE_FILE,
+    changesRel,
+    publishServer,
+    writeRunState,
+    signRun,
+} from './server/publish.js';
+export {
+    HOUSE_DIR,
+    HOUSE_TMP,
+    HOUSE_ASSETS,
+    HOUSE_LOGS,
+    HOUSE_WORK,
+    MANIFEST_FILE,
+    MANIFEST_VERSION,
+    HOUSE_SYSTEMS,
+    houseDir,
+    workRel,
+    workDir,
+    runStateDir,
+    assetsDir,
+    logsDir,
+    manifestPath,
+    toProjectPath,
+    readManifest,
+    writeManifest,
+    publish,
+    findGenerated,
+    writeFileAtomic,
+} from './shared/house.js';
+export {
     MCP_PROTOCOL_VERSION,
     MCP_SUPPORTED_PROTOCOLS,
     MCP_ERROR,

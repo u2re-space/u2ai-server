@@ -23,6 +23,9 @@ import {
   homeSkillsDir,
   homeLogsDir,
   serveFile,
+  homeTmpDir,
+  homeRunDir,
+  homeLayout,
   resolveConfigPath,
   ensureHomeDir,
 } from './paths.js';
@@ -39,6 +42,9 @@ export {
   homeSkillsDir,
   homeLogsDir,
   serveFile,
+  homeTmpDir,
+  homeRunDir,
+  homeLayout,
   resolveConfigPath,
   ensureHomeDir,
 };
