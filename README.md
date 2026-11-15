@@ -533,12 +533,14 @@ already runs with the code `ALREADY_RUNNING`.
 
 ```bash
 npm run check     # parse every file of the package
-npm test          # 433 tests
+npm test          # 463 tests
 npm pack --dry-run
 ```
 
 The tests need no key and no network: the model is a stub, the servers listen on
-`127.0.0.1` and the home directory of every test is a temporary one.
+`127.0.0.1` and the home directory of every test is a temporary one. The suite is also
+guarded: `test/offline-guard.js` refuses every address outside the machine, so a test that
+reaches the outside fails fast instead of spending money.
 
 ---
 
