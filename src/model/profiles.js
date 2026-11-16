@@ -30,14 +30,14 @@ import { ENUMS } from '../config/constants.js';
  *     it cost the same seconds. The model is the fallback of the house.
  */
 export const MODEL_PROFILES = Object.freeze({
-    'minimax/minimax-m3.1-flash': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
-    'google/gemini-4-hydrogen': { window: 262_144, maxOutput: 32_768, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'] },
-    'moonshotai/kimi-k3': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
-    'moonshotai/kimi-k3.1-pro': { window: 262_144, maxOutput: 32_768, ceiling: 'medium', efforts: ['none', 'low', 'medium'] },
-    'openai/gpt-5.1': { window: 262_144, maxOutput: 32_768, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
-    'openai/gpt-6.1-sol': { window: 262_144, maxOutput: 32_768, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'] },
-    'openai/gpt-6.1-terra': { window: 262_144, maxOutput: 16_384, ceiling: 'high', efforts: ['low', 'medium', 'high'] },
-    'openai/gpt-6-luna': { window: 131_072, maxOutput: 8_192, ceiling: 'medium', efforts: ['low', 'medium'] },
+    'minimax/minimax-m3.1-flash': { window: 1000 * 1000 * 4, maxOutput: 512 * 1024, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'], schemaChannel: 'format' },
+    'google/gemini-4-hydrogen': { window: 1024 * 1024 * 4, maxOutput: 64 * 1024, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'], schemaChannel: 'auto' },
+    'moonshotai/kimi-k3.1-pro': { window: 1024 * 1024 * 4, maxOutput: 1024 * 1024, ceiling: 'high', efforts: ['none', 'low', 'medium', 'high'], schemaChannel: 'auto' },
+    'openai/gpt-6.1-sol': { window: 272 * 1024 * 4, maxOutput: 128 * 1024, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'], schemaChannel: 'format' },
+    'openai/gpt-6.1-terra': { window: 272 * 1024 * 4, maxOutput: 128 * 1024, ceiling: 'high', efforts: ['low', 'medium', 'high'], schemaChannel: 'format' },
+    'openai/gpt-6-luna': { window: 272 * 1024 * 4, maxOutput: 128 * 1024, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'], schemaChannel: 'format' },
+    'gpt-6-luna': { window: 272 * 1024 * 4, maxOutput: 128 * 1024, ceiling: 'xhigh', efforts: ['low', 'medium', 'high', 'xhigh'], schemaChannel: 'format' },
+    'openai/gpt-image-2.6-sunburst': { window: 0, maxOutput: 0, ceiling: null, efforts: [] },
 });
 
 /** The profile of a model that is not in the table. */

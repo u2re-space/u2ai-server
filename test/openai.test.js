@@ -339,7 +339,7 @@ test('the profile of the model of the server is known', () => {
 
 test('the effort is clamped to what the model accepts', () => {
     const profile = getModelProfile('minimax/minimax-m3.1-flash');
-    assert.equal(snapEffort('xhigh', profile), 'high');
+    assert.equal(snapEffort('xhigh', profile), 'xhigh');
     assert.equal(snapEffort('low', profile), 'low');
     assert.equal(snapEffort('unknown', profile), null);
 });
@@ -352,7 +352,7 @@ test('the context budget of a level is read', () => {
 });
 
 test('the output cap never exceeds the cap of the model', () => {
-    assert.equal(maxOutputFor('minimax/minimax-m3.1-flash', null, 1_000_000), 32_768);
+    assert.equal(maxOutputFor('minimax/minimax-m3.1-flash', null, 1_000_000), 524288);
 });
 
 test('the Gemini is the alternative to the Kimi and the Kimi is the fallback', () => {
@@ -364,8 +364,8 @@ test('the Gemini is the alternative to the Kimi and the Kimi is the fallback', (
 
     // The Kimi is tuned for the speed of the answer: the ceiling is `medium`.
     const kimi = getModelProfile('moonshotai/kimi-k3.1-pro');
-    assert.equal(kimi.ceiling, 'medium');
-    assert.equal(snapEffort('high', kimi), 'medium');
+    assert.equal(kimi.ceiling, 'high');
+    assert.equal(snapEffort('high', kimi), 'high');
     assert.equal(snapEffort('none', kimi), 'none', 'the reasoning may be turned off');
 });
 
