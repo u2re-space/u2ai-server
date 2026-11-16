@@ -190,6 +190,20 @@ export function validateConfig(config) {
     fail('tools.terminal требует tools.allowWrite: true — иначе терминал может обойти запрет записи.');
   }
 
+  if (!isRecord(c.browser)) fail('browser должен быть объектом');
+  for (const key of Object.keys(c.browser)) {
+    if (!(key in defaults.browser)) fail(`browser.${key}: неизвестное поле (допустимо: ${Object.keys(defaults.browser).join(', ')})`);
+  }
+  if (!['auto', 'ego', 'chrome'].includes(c.browser.engine)) fail('browser.engine: auto | ego | chrome');
+  if (c.browser.executable !== null && (typeof c.browser.executable !== 'string' || !c.browser.executable.trim())) {
+    fail('browser.executable: непустая строка или null');
+  }
+  if (!Number.isSafeInteger(c.browser.timeoutMs) || c.browser.timeoutMs < 1000) fail('browser.timeoutMs: целое от 1000');
+  if (!isRecord(c.browser.viewport)) fail('browser.viewport должен быть объектом');
+  for (const key of ['width', 'height']) {
+    if (!Number.isSafeInteger(c.browser.viewport[key]) || c.browser.viewport[key] < 100) fail(`browser.viewport.${key}: целое от 100`);
+  }
+
   if (!isRecord(c.server)) fail('server должен быть объектом');
   for (const key of Object.keys(c.server)) if (!(key in defaults.server)) fail(`server.${key}: неизвестное поле`);
   if (typeof c.server.host !== 'string' || !c.server.host.trim()) fail('server.host: непустая строка');

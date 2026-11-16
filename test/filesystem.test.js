@@ -318,22 +318,24 @@ test('the copy refuses a tree with a secret', async () => {
 });
 
 test('the catalog holds the file system tools, the terminal ones and the context ones', () => {
-  assert.equal(TOOL_NAMES.length, 13);
+  assert.equal(TOOL_NAMES.length, 14);
   for (const name of TOOL_NAMES) assert.ok(TOOL_SPECS[name], name);
   assert.equal(toolCategory('write_file'), 'write');
   assert.equal(toolCategory('read_file'), 'read');
   assert.equal(toolCategory('run_command'), 'exec');
   assert.equal(toolCategory('scan_workspace'), 'read');
+  assert.equal(toolCategory('screenshot'), 'read');
   assert.equal(toolRisk('delete_file'), 'high');
   assert.equal(toolCategory('nope'), null);
   assert.equal(describeTool('nope'), null);
   assert.match(describeTool('list_files').description, /List the files/);
+  assert.match(describeTool('screenshot').description, /screenshot/);
   assert.ok(toolsByCategory('read').includes('search_files'));
 });
 
 test('the definitions of the tools are ready for the request', () => {
   const defs = toolDefinitions();
-  assert.equal(defs.length, 13);
+  assert.equal(defs.length, 14);
   for (const def of defs) {
     assert.equal(def.type, 'function');
     assert.ok(def.name);

@@ -35,6 +35,7 @@ import { resolveInside } from '../agent/access.js';
 import { scanWorkspace, formatWorkspace } from './context.js';
 import { collectRoleContext } from '../agent/context.js';
 import { suggest } from './suggest.js';
+import { screenshotPage } from './browser.js';
 
 /** The categories of the tools: they drive the approval. */
 export const TOOL_CATEGORIES = Object.freeze(['read', 'write', 'exec']);
@@ -257,6 +258,19 @@ export const TOOL_SPECS = Object.freeze({
             prefix: str('The text the paths carry. Empty = the first paths of the tree.'),
             kind: { type: 'string', enum: ['path', 'command', 'all'], description: 'What to suggest. The default is all.' },
         }, ['prefix', 'kind']),
+    },
+    screenshot: {
+        category: 'read',
+        group: 'browser',
+        risk: 'low',
+        description: 'Open the page of the working directory in a real browser (Ego Lite when it is installed, otherwise headless Chrome/Edge) and take a screenshot of it. The project is served locally, so no server has to be running. Use it to see the result of the work: a layout that compiles may still be broken. The answer names the file of the picture and what the page says about itself: the console, the exceptions and the failed requests.',
+        parameters: schema({
+            path: nullableStr('The page to shoot, relative to the working directory (for example `index.html`). Null = the entry point of the project.'),
+            output: nullableStr('Where to write the picture, relative to the working directory. Null = .ai/shots/page-<time>.png.'),
+            url: nullableStr('A live address of the page, for example the dev server of the project (http://localhost:5173/). Null = the page of the working directory.'),
+            width: nullableInt('The width of the picture in pixels. The default is 1440.'),
+            height: nullableInt('The height of the picture in pixels. The default is 900.'),
+        }, ['path', 'output', 'url', 'width', 'height']),
     },
 });
 
@@ -497,6 +511,7 @@ const GROUP_FLAGS = Object.freeze({
     shell: 'terminal',
     workspace: 'workspace',
     suggest: 'suggest',
+    browser: 'browser',
 });
 
 /**
@@ -685,6 +700,26 @@ export async function executeTool(name, args = {}, { root, config = null, signal
                 ...out.commands.map((item) => `- ${item}`),
             ];
             return { text: lines.join('\n') || '- (none)', data: out };
+        },
+        screenshot: async () => {
+            const shot = await screenshotPage({
+                root,
+                config: config ?? {},
+                page: params.path ?? null,
+                output: params.output ?? '',
+                url: params.url ?? null,
+                width: params.width ?? 1440,
+                height: params.height ?? 900,
+            });
+            const lines = [
+                `The screenshot of the page is ready: ${shot.rel}`,
+                `bytes: ${shot.bytes}`,
+                `engine: ${shot.engine}`,
+            ];
+            if (shot.log) {
+                lines.push('', 'What the page says about itself:', shot.log);
+            }
+            return { text: lines.join('\n'), data: shot };
         },
     }[name]();
 

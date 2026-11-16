@@ -231,6 +231,18 @@ export {
 } from './tools/context.js';
 export { suggestPaths, suggestCommands, suggest } from './tools/suggest.js';
 export {
+    chromiumCandidates,
+    egoCandidates,
+    findEgo,
+    findChromium,
+    resolveEngine,
+    chromeArgs,
+    startStaticServer,
+    entryPage,
+    screenshotPage,
+} from './tools/browser.js';
+export { collectPageDiagnostics, diagnosticsText } from './tools/cdp.js';
+export {
     AGENT_FILE_NAMES,
     parseMention,
     collectMentions,

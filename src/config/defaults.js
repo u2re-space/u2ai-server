@@ -101,10 +101,31 @@ export const defaults = {
     terminal: true,
     workspace: true,
     suggest: true,
+    /** The eye of the service: shoot the page of the working directory. */
+    browser: true,
     /** Let the tools write; when false the service is read-only. */
     allowWrite: true,
     /** Let the tools run commands; when false the terminal is off. */
     allowTerminal: true,
+  },
+
+  // --- browser ---------------------------------------------------------------
+  /**
+   * The browser of the service: the engine that opens the page of the working directory.
+   *
+   * Ego Lite (`ego`) is the engine of the house when it is installed. Otherwise the
+   * service falls back to headless Chrome/Edge, which is read-only: it opens a page and takes
+   * a picture of it.
+   */
+  browser: {
+    /** `auto` prefers Ego Lite, `ego` demands it, `chrome` demands a headless Chromium. */
+    engine: 'auto',
+    /** The path of the browser, when the usual places do not hold it. */
+    executable: null,
+    /** How long one call of the browser may take, in milliseconds. */
+    timeoutMs: 45_000,
+    /** The frame of the picture of the page: the width and the height in pixels. */
+    viewport: { width: 1440, height: 900 },
   },
 
   // --- server ---------------------------------------------------------------

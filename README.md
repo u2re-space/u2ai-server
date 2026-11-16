@@ -22,7 +22,7 @@ ai-serve --help
 | The HTTP part (`src/server/http.js`) | The routes `/health`, `/v1/tools`, `/v1/serves`, `/v1/complete`, `/v1/structure` on the same port and with the same token. |
 | The MCP server (`src/server/mcp.js`) | JSON-RPC 2.0 without an SDK: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`. Stdio or HTTP. |
 | The stdio transports (`src/server/stdio.js`, `src/client/stdio.js`) | The line of JSON that goes in and the line of JSON that comes out: the server of the package and the child process of an outside server. |
-| The tools (`src/tools/*`) | The catalog of the agent: the filesystem, the terminal, the map of the workspace, the suggestions. |
+| The tools (`src/tools/*`) | The catalog of the agent: the filesystem, the terminal, the map of the workspace, the suggestions, the eye (the screenshot of the page). |
 | The roles (`src/roles/*`) | The loop of the agent: the analyzer, the director, the executor, the tooler, the suggester. |
 | The OpenAI layer (`src/openai/*`) | The Responses API first, the Chat Completions as the fallback, the rotation of the backends with the retries. |
 | The client (`src/client/*`) | The MCP client (stdio and HTTP) and the proxy of the outside services. |
@@ -169,7 +169,8 @@ The order of the sources: the defaults, then `~/.ai-serve/config.json`, then the
     { "baseURL": "https://api.proxyapi.ru/v1", "env": "PROXYAPI_API_KEY" }
   ],
   "server": { "host": "127.0.0.1", "port": 0, "approve": "ask" },
-  "tools": { "allowWrite": true, "allowTerminal": true },
+  "tools": { "allowWrite": true, "allowTerminal": true, "browser": true },
+  "browser": { "engine": "auto", "viewport": { "width": 1440, "height": 900 } },
   "completion": { "enabled": true, "model": null },
   "mcp": { "enabled": true, "transport": "stdio" },
   "roles": {
@@ -340,9 +341,42 @@ The methods: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
 | `scan_workspace` | read | low | The map of the workspace: the kind of the project, the aliases, the entry points. |
 | `collect_context` | read | low | The card of the workspace, the `AGENTS.md` files, the files of `@path`. |
 | `suggest` | read | low | The paths and the commands that fit the context. |
+| `screenshot` | read | low | A screenshot of the page of the working directory, taken in a real browser. |
 
 The configuration decides which of them the model sees: `tools.allowWrite: false` hides
-every tool of the category `write`, `tools.allowTerminal: false` hides the category `exec`.
+every tool of the category `write`, `tools.allowTerminal: false` hides the category `exec`,
+`tools.browser: false` hides the eye.
+
+### The eye of the service
+
+The editor sees the code; the page is another thing. The tool `screenshot` opens the page of
+the working directory in a real browser and takes a picture of it, so the agent can look at
+what it has written — the layout, the proportions, the type — instead of guessing from the
+CSS. The picture is written under `.ai/shots/`, and the answer names the file.
+
+The project is served by a local server of the package: a `file://` URL breaks the modules and
+the fetch of a modern project, so no server has to be running for the call.
+
+Two engines are supported: **headless Chrome/Edge**, which is read-only, is on every desktop and
+takes the snapshot by default; and **Ego Lite** (`ego`), the engine of the house with the window
+and the interaction, used when it is asked for explicitly (`browser.engine: "ego"`).
+
+The tool speaks to the browser over the Chrome DevTools Protocol, so the answer holds the
+picture **and** what the page says about itself: the console, the exceptions and the failed
+requests (404, 500). A failed request names the file that is missing, an exception names the line
+that broke. The `url` argument points the browser at a live address — the dev server of the
+project (`http://localhost:5173/`) shows the styles as they are now.
+
+```json
+{
+  "browser": {
+    "engine": "auto",
+    "executable": null,
+    "timeoutMs": 45000,
+    "viewport": { "width": 1440, "height": 900 }
+  }
+}
+```
 
 ### The tools of the clients
 
