@@ -324,6 +324,26 @@ The methods: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`,
 `resources/read`, `prompts/list`, `prompts/get`. The notifications
 (`notifications/initialized`, `notifications/cancelled`) are answered silently.
 
+### The data URLs of a message
+
+A message that carries a picture as text carries it twice: once as the base64 and once as the
+words around it. Nobody reads the base64 — the model sees a wall of characters, the request
+grows by a third of the picture for nothing, and some gateways refuse such a message
+altogether.
+
+So every data URL is cut out of the text of a message and the payload goes into the request as
+what it is: `data:image/png;base64,…` becomes an image part, `data:application/pdf;base64,…`
+becomes a file part (`file_data` in base64), `data:text/plain,…` becomes a text part. In the
+text itself a short note takes the place of the data URL:
+
+```
+The picture of the reference: [picture attached: image/png, 12.4 KB]
+```
+
+The cut happens in the answer of a tool and in the builder of the request — the last one is the
+safety net: every text that leaves the server is cut there, whatever path it took. The words
+of a message without a data URL are not touched.
+
 ### The tools
 
 | Tool | Category | Risk | What it does |

@@ -24,6 +24,7 @@
  */
 
 import { parseResponse, textPart } from '../openai/responses.js';
+import { assetPart, scrubDataUrls } from '../shared/data-urls.js';
 import { toolDefinitions, toolCategory } from '../tools/tools.js';
 import { collectRoleContext } from '../agent/context.js';
 import { analyzeTask } from './analyzer.js';
@@ -249,7 +250,21 @@ export function createRoleAsk({
                 calls.push({ name: call.name, arguments: call.arguments, ok: result.ok, text: result.text });
                 const id = call.callId ?? call.id ?? null;
                 input.push({ type: 'function_call', call_id: id, name: call.name, arguments: call.raw ?? JSON.stringify(call.arguments ?? {}) });
-                input.push({ type: 'function_call_output', call_id: id, output: result.text });
+                // A data URL in the answer of the tool is cut out of the text: the payload
+                // goes into the request as what it is — a picture, a file, a text — and the
+                // text keeps a short note.
+                const scrubbed = scrubDataUrls(String(result.text ?? ''));
+                input.push({ type: 'function_call_output', call_id: id, output: scrubbed.text });
+                const assets = scrubbed.assets.map((asset) => assetPart(asset)).filter(Boolean);
+                if (assets.length) {
+                    input.push({
+                        role: 'user',
+                        content: [
+                            textPart('The data of the answer above is attached here: it travels as itself, not as text.'),
+                            ...assets,
+                        ],
+                    });
+                }
             }
         }
         return {
