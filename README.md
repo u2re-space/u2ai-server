@@ -340,6 +340,15 @@ text itself a short note takes the place of the data URL:
 The picture of the reference: [picture attached: image/png, 12.4 KB]
 ```
 
+**The name of the caller is a claim, the bytes are the fact.** The house looks at the payload
+before it decides what it is: a picture that came as `application/octet-stream` is a picture,
+a JSON that came as a blob is text, and a binary that came as `text/plain` is a file. When the
+name and the content differ, the note names both:
+
+```
+[picture attached: application/octet-stream → image/png, 317.8 KB]
+```
+
 The cut happens in the answer of a tool and in the builder of the request — the last one is the
 safety net: every text that leaves the server is cut there, whatever path it took. The words
 of a message without a data URL are not touched.
