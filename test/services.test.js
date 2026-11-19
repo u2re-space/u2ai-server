@@ -148,8 +148,10 @@ test('the outside service is started and its file is read', async () => {
     assert.match(service.url, /^ws:\/\/127\.0\.0\.1:\d+$/);
     assert.match(service.httpURL, /^http:\/\/127\.0\.0\.1:\d+$/);
     assert.match(service.token, /^[0-9a-f]{64}$/);
-    assert.equal(service.record.pid, service.pid);
-    assert.ok(pidAlive(service.pid));
+    // The service itself is the worker of the shell: the file names the process that
+    // listens, and the shell only waits for it.
+    assert.notEqual(service.record.pid, service.pid);
+    assert.ok(pidAlive(service.record.pid));
     const record = await readServeRecord(serveFile(home));
     assert.equal(record.token, service.token);
     assert.equal(record.url, service.url);
@@ -234,7 +236,8 @@ test('the state of the services is listed', async () => {
       { name: 'off', url: service.httpURL, enabled: false },
     ]);
     assert.equal(list[0].status, 'running');
-    assert.equal(list[0].pid, service.pid);
+    // The service is the worker of the shell: the file names the process that listens.
+    assert.equal(list[0].pid, service.record.pid);
     assert.equal(list[1].status, 'running');
     assert.equal(list[2].status, 'stopped');
     assert.equal(list[3].status, 'disabled');

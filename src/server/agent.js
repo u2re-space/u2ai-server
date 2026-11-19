@@ -92,7 +92,8 @@ function toolsOfRun(config, frame) {
  * client, and the agent answers with the events of the run.
  *
  * @param {{ hub: object, config?: object|null, root?: string, model?: string|null,
- *           approve?: string, client?: object|null, instructions?: string|null }} options
+ *           approve?: string, client?: object|null, instructions?: string|null,
+ *           onEvent?: Function|null }} options
  * @returns {{ start: (run: object, frame: object) => Promise<void> }}
  * @exports
  * @ai.hint io
@@ -105,6 +106,7 @@ export function createServerAgent({
     approve = 'ask',
     client = null,
     instructions = null,
+    onEvent = null,
 } = {}) {
     if (!hub) throw new Error('The agent needs the hub of the bus.');
     let clientPromise = null;
@@ -134,7 +136,14 @@ export function createServerAgent({
      * @ai.hint pure
      */
     const publish = (runId, event) => {
-        try { hub.publish(runId, event); } catch { /* the bus is gone */ }
+        try {
+            hub.publish(runId, event);
+        } catch { /* the bus is gone */ }
+        // The reader of the terminal sees the events of the runs too: the service is alive,
+        // and the person at the terminal sees what it is doing.
+        try {
+            onEvent?.({ id: runId, ...event });
+        } catch { /* an observer never breaks a run */ }
     };
 
     /**

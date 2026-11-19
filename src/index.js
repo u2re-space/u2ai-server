@@ -6,9 +6,11 @@
  */
 
 export { main, EXIT } from './cli.js';
+export { mainTui } from './tui/cli.js';
 export { parseArgv } from './cli/parser.js';
 export { HELP, COMMAND_NAMES } from './help.js';
 export { COLORS, paint } from './cli/colors.js';
+export { createPlainRenderer, createRenderer, detectMode, eventLine } from './cli/renderer.js';
 export { checkNodeVersion, REQUIRED_NODE } from './cli/compatibility.js';
 export { runDoctor, formatDoctor, CHECK_STATES } from './cli/doctor.js';
 

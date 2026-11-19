@@ -459,10 +459,20 @@ export async function startServiceProcess({
             if (child.exitCode == null && child.signalCode == null) child.kill();
             await waitForExit(exited, 3000);
             if (child.exitCode == null && child.signalCode == null) child.kill('SIGKILL');
-            // The file of the address is ours when it names our own process.
+            // The file of the address is ours when it names our own process. The service may
+            // be the worker of the shell we started: wait for it to go, and take the file
+            // away when it is gone.
             if (file) {
-                const current = await readRecord();
-                if (!current || current.pid === child.pid) await rm(file, { force: true });
+                let current = await readRecord();
+                if (current && current.pid !== child.pid) {
+                    for (let attempt = 0; attempt < 40 && pidAlive(current.pid); attempt += 1) {
+                        await delay(50);
+                    }
+                    current = await readRecord();
+                }
+                if (!current || current.pid === child.pid || !pidAlive(current.pid)) {
+                    await rm(file, { force: true });
+                }
             }
         },
     };

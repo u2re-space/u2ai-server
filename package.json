@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./index.js",
   "bin": {
-    "ai-serve": "./bin/ai-serve.js"
+    "ai-serve": "./bin/ai-serve.js",
+    "ai-serve-worker": "./bin/ai-serve-worker.js"
   },
   "repository": {
     "type": "git",
@@ -38,5 +39,8 @@
     "agent",
     "autocomplete"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "terminal-kit": "^3.1.4"
+  }
 }

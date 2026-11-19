@@ -29,6 +29,15 @@ export const HELP = `ai-serve — an MCP server with tools, a bus for editor ext
 Usage:
   ai-serve <command> [options]
 
+Interface:
+  In a terminal, ai-serve opens the graphical dashboard of the house: the commands of the
+  service, the addresses it listens on, the live log of the runs and the operator line. The
+  internal worker is ai-serve-worker; it owns the ordinary stdout and stderr and talks to
+  the shell over a versioned IPC protocol.
+
+  A pipe, a redirect, --json, --quiet and --headless use the worker directly. The machine
+  output stays the same: --json prints one json object per line on stdout.
+
 Commands:
   serve                Run the bus, the HTTP bridge and the MCP server. Writes serve.json.
   mcp                  Run the MCP server only: stdio by default, HTTP with --http.
@@ -60,6 +69,9 @@ Options:
       --stdio          The MCP server speaks stdio (default).
   -c, --config <file>   The config file to use.
       --json           Print the result as JSON.
+      --quiet          Only the result of the run.
+      --headless       The worker without the graphical shell.
+      --ascii          The symbols of the terminal without the unicode ones.
   -h, --help           Print this text.
   -v, --version        Print the version.
 

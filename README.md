@@ -45,6 +45,23 @@ ai-serve --help
 
 The exit codes are `0` (done), `1` (a failure), `2` (a usage error) and `130` (interrupted).
 
+### The shell of the service
+
+In a terminal, `ai-serve` opens the graphical dashboard of the house: the commands of the
+service, the addresses it listens on, the live log of the runs and the operator line. The
+service itself is the internal worker `ai-serve-worker`: it owns the ordinary stdout and
+stderr and talks to the shell over a versioned IPC protocol.
+
+```bash
+ai-serve serve            # the dashboard of the running service
+ai-serve serve --headless # the worker alone: the machine output stays the same
+ai-serve serve --json     # one json object per line on stdout
+```
+
+The events of the runs are shown in the dashboard as they happen: the tools the agent calls,
+the answers of the model, the questions and the warnings. The signal of the shell reaches the
+worker, so the service does not stay alive when the shell that started it is gone.
+
 ### Examples
 
 ```bash

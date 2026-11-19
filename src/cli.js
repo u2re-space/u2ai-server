@@ -14,6 +14,7 @@ import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { parseArgv } from './cli/parser.js';
 import { checkNodeVersion } from './cli/compatibility.js';
+import { createPlainRenderer, createRenderer, detectMode } from './cli/renderer.js';
 import { runDoctor, formatDoctor } from './cli/doctor.js';
 import { loadConfig, redactConfig } from './config.js';
 import { readMcpFile, registerService, removeService, registerMcpServer, removeMcpServer } from './config/parser.js';
@@ -105,10 +106,12 @@ function resolvePort(flag, config) {
  * The command runs until the process is interrupted. The file with the address of the
  * server is removed on the way out.
  * @param {object} opts
+ * @param {{ renderer?: object|null }} [context] the renderer of the events of the runs
  * @returns {Promise<number>}
  * @ai.hint io
  */
-async function commandServe(opts) {
+async function commandServe(opts, context = {}) {
+    const renderer = context.renderer ?? null;
     const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
     let config;
     try {
@@ -145,6 +148,9 @@ async function commandServe(opts) {
         config,
         root: cwd,
         approve: config.server?.approve ?? 'ask',
+        // The events of the runs are shown to the person at the terminal too: the service
+        // is alive, and the reader sees what it is doing.
+        onEvent: (run, event) => renderer?.event?.(event),
     });
 
     // The bridge of the completion. The client of the API is made on the first request,
@@ -773,12 +779,16 @@ function maskToken(token) {
 
 /**
  * Main entry point: parse the arguments and dispatch the command.
+ *
+ * The renderer may come from the worker: the graphical shell runs the same command in its
+ * own process and listens to the events over the protocol.
  * @param {string[]} argv
+ * @param {{ renderer?: object|null, input?: object|null }} [options]
  * @returns {Promise<number>} the exit code
  * @exports
  * @ai.hint io
  */
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), { renderer: given = null, input = null } = {}) {
     const opts = parseArgv(argv);
     if (opts.help) {
         console.log(HELP);
@@ -795,17 +805,25 @@ export async function main(argv = process.argv.slice(2)) {
         return EXIT.failure;
     }
 
+    // The renderer of the events of the runs: the worker sends them to the shell, the plain
+    // CLI prints them as lines.
+    const mode = opts.flags.json ? 'json' : (opts.flags.quiet ? 'quiet' : 'plain');
+    const renderer = given ?? (detectMode() === 'tty'
+        ? createRenderer({ verbose: opts.verbose, mode })
+        : createPlainRenderer({ verbose: opts.verbose, mode }));
+    const context = { renderer, input };
+
     if (opts.command === 'config') {
         return await commandConfig(opts);
     }
     if (opts.command === 'serve') {
-        return await commandServe(opts);
+        return await commandServe(opts, context);
     }
     if (opts.command === 'mcp') {
         return await commandMcp(opts);
     }
     if (opts.command === 'agent') {
-        return await commandAgent(opts);
+        return await commandAgent(opts, context);
     }
     if (opts.command === 'tools') {
         return await commandTools(opts);
