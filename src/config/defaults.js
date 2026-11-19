@@ -231,10 +231,11 @@ export const defaults = {
    * The house of the run: the ranks of the models of the house in their families.
    *
    * A path is a list of the places of a family: the role answers on the first place and
-   * steps down to the next one when its work is done.
+   * steps down to the next one when its work is done. The path belongs to the role: the
+   * stages inherit it.
    */
   house: {
-    ranks: { roles: {}, stages: {} },
+    ranks: { roles: {} },
   },
 
   // --- roles ----------------------------------------------------------------
