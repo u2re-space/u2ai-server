@@ -142,6 +142,49 @@ test('the list of the tools of a role may be narrowed', () => {
   assert.deepEqual(roleToolNames(config, 'analyzer'), ['read_file']);
 });
 
+test('the instructions of a role carry the catalogue of the skills', async () => {
+  const root = await tempProject();
+  const home = await mkdtemp(path.join(os.tmpdir(), 'ai-serve-skills-home-'));
+  const skill = path.join(root, '.agents', 'skills', 'oil-ui');
+  await mkdir(skill, { recursive: true });
+  await writeFile(
+    path.join(skill, 'SKILL.md'),
+    '---\nname: oil-ui\ndescription: UI design workflow.\n---\nChoose a direction.',
+    'utf8',
+  );
+  const { client, calls } = fakeClient([schemaCall('analysis', {
+    goal: 'g', kind: 'code', summary: 's', files: [], risks: [], questions: [],
+  })]);
+  await runRole('analyzer', {
+    task: 'polish the interface',
+    config: { home },
+    client,
+    root,
+    env: { HOME: home },
+  });
+  assert.match(calls[0].instructions, /oil-ui/);
+  assert.match(calls[0].instructions, /read_skill/);
+});
+
+test('the instructions of a role carry its role packs', async () => {
+  const root = await tempProject();
+  const home = await mkdtemp(path.join(os.tmpdir(), 'ai-serve-pack-home-'));
+  await mkdir(path.join(home, 'skills'), { recursive: true });
+  await writeFile(path.join(home, 'skills', 'executor.md'), 'Keep the spacing on a 4px grid.', 'utf8');
+  const { client, calls } = fakeClient([schemaCall('step_report', {
+    status: 'done', note: 'done', files: [],
+  })]);
+  await runRole('executor', {
+    task: 'change the styles',
+    plan: { steps: [{ id: 'one', title: 'Change', action: 'change', files: [], verify: '' }] },
+    config: { home },
+    client,
+    root,
+    env: { HOME: home },
+  });
+  assert.match(calls[0].instructions, /4px grid/);
+});
+
 test('the configuration decides which tools exist', () => {
   assert.equal(toolAllowed('read_file', { tools: { read: false } }), false);
   assert.equal(toolAllowed('write_file', { tools: { allowWrite: false } }), false);

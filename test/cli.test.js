@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 
 import { main, EXIT, HELP, COMMAND_NAMES } from '../src/index.js';
 import { runDoctor, formatDoctor } from '../src/cli/doctor.js';
@@ -95,6 +95,24 @@ test('the command tools prints a table', async () => {
     const answer = await runCli(['tools']);
     assert.equal(answer.code, EXIT.ok);
     assert.match(answer.output, /read_file/);
+});
+
+test('the command skills lists the installed Agent Skills', async () => {
+    const home = await tempHome();
+    const cwd = await tempHome();
+    const skill = path.join(cwd, '.agents', 'skills', 'oil-ui');
+    await mkdir(skill, { recursive: true });
+    await writeFile(
+        path.join(skill, 'SKILL.md'),
+        '---\nname: oil-ui\ndescription: UI design workflow.\n---\nChoose a direction.',
+        'utf8',
+    );
+    const answer = await runCli(['skills', '--json', '--cwd', cwd], { home, env: { HOME: home } });
+    assert.equal(answer.code, EXIT.ok);
+    const rows = JSON.parse(answer.output);
+    assert.ok(rows.some((row) => row.name === 'oil-ui'));
+    await rm(home, { recursive: true, force: true });
+    await rm(cwd, { recursive: true, force: true });
 });
 
 test('the command config prints the resolved configuration', async () => {

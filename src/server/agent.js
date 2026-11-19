@@ -33,6 +33,7 @@ import { parseResponse, textPart } from '../openai/responses.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed, toolDefinitions } from '../tools/tools.js';
 import { signRun } from './publish.js';
 import { resolveModelRef } from '../model/refs.js';
+import { buildSkillInstructions, discoverSkills, skillsDirectory } from '../agent/skills.js';
 
 /** The commands the agent of the bus answers. */
 export const AGENT_COMMANDS = Object.freeze(['ask', 'run', 'chat']);
@@ -363,9 +364,18 @@ export function createServerAgent({
     const start = async (run, frame) => {
         const command = String(frame?.command ?? 'ask');
         const signal = run?.controller?.signal ?? null;
-        const system = instructions ?? (
+        const tools = command === 'ask' ? [] : toolsOfRun(config, frame);
+        const baseSystem = instructions ?? (
             command === 'run' ? RUN_INSTRUCTIONS : command === 'chat' ? CHAT_INSTRUCTIONS : AGENT_INSTRUCTIONS
         );
+        const skillDir = skillsDirectory(config);
+        const availableSkills = tools.includes('read_skill')
+            ? await discoverSkills(rootOf(run, frame), {
+                extraDirs: skillDir ? [skillDir] : [],
+            })
+            : [];
+        const skillCatalogue = buildSkillInstructions(availableSkills);
+        const system = [baseSystem, skillCatalogue].filter(Boolean).join('\n\n');
         const maxTurns = Number.isSafeInteger(frame?.maxTurns) && frame.maxTurns > 0
             ? frame.maxTurns
             : (config?.limits?.maxTurns ?? 24);
@@ -385,7 +395,6 @@ export function createServerAgent({
                 hub.finish(run.id, 'failed', 1);
                 return;
             }
-            const tools = command === 'ask' ? [] : toolsOfRun(config, frame);
             if (command === 'chat') {
                 await chat(run, frame, { tools, system, signal, maxTurns, changes });
             } else {

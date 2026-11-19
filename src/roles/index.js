@@ -28,6 +28,12 @@ import { assetPart, scrubDataUrls } from '../shared/data-urls.js';
 import { resolveModelRef, rankPath } from '../model/refs.js';
 import { toolDefinitions, toolCategory } from '../tools/tools.js';
 import { collectRoleContext } from '../agent/context.js';
+import {
+    buildSkillInstructions,
+    discoverSkills,
+    skillsDirectory,
+    skillsForRole,
+} from '../agent/skills.js';
 import { analyzeTask } from './analyzer.js';
 import { planWork } from './director.js';
 import { executePlan } from './executor.js';
@@ -308,6 +314,7 @@ export async function runRole(role, {
     config = null,
     client,
     root,
+    env = process.env,
     signal = null,
     onEvent = null,
     maxTurns = null,
@@ -329,9 +336,21 @@ export async function runRole(role, {
     }
     const catalog = roleToolNames(config, role);
     const directTools = ROLE_TOOLS[role] === 'none' ? [] : catalog;
-    const instructions = settings.instructions
-        ? `${ROLE_PROMPTS[role]}\n\n${settings.instructions}`
-        : ROLE_PROMPTS[role];
+    const skillDir = skillsDirectory(config);
+    const roleSkillText = await skillsForRole({ dir: skillDir, role });
+    const availableSkills = catalog.includes('read_skill')
+        ? await discoverSkills(root, {
+            env,
+            extraDirs: skillDir ? [skillDir] : [],
+        })
+        : [];
+    const skillCatalogue = buildSkillInstructions(availableSkills);
+    const skillInstructions = [roleSkillText, skillCatalogue].filter(Boolean).join('\n\n');
+    const instructions = [
+        ROLE_PROMPTS[role],
+        settings.instructions,
+        skillInstructions,
+    ].filter(Boolean).join('\n\n');
     const ask = createRoleAsk({
         client,
         config,

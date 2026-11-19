@@ -37,6 +37,7 @@ ai-serve --help
 | `ai-serve serve [--port n]` | Run the bus, the HTTP part and the MCP endpoint. Writes `~/.ai-serve/serve.json`. |
 | `ai-serve mcp [--stdio\|--http] [--port n]` | Run the MCP server only: stdio by default, HTTP with `--http`. |
 | `ai-serve tools [--json]` | The list of the tools of the package: the name, the category, the risk, the description. |
+| `ai-serve skills [--json]` | The list of the installed Agent Skills of the project and the user. |
 | `ai-serve agent "<task>" [--cwd dir] [--role name]` | A one-off task as an AI agent. Without a role the agent analyzes, plans and does the work. |
 | `ai-serve complete --file <path> --line <n>` | A one-off completion for the file and the line. The answer is the text to insert. |
 | `ai-serve services [list\|add\|add-mcp\|remove]` | The outside services: their state, their addresses, their tokens. |
@@ -456,7 +457,7 @@ of a message without a data URL are not touched.
 
 The configuration decides which of them the model sees: `tools.allowWrite: false` hides
 every tool of the category `write`, `tools.allowTerminal: false` hides the category `exec`,
-`tools.browser: false` hides the eye.
+`tools.browser: false` hides the eye, and `tools.skills: false` hides `read_skill`.
 
 ### The eye of the service
 
@@ -506,6 +507,44 @@ client published, not with the name of the list.
 
 The same list is in the route `/v1/tools` of the HTTP part: the tools of the clients are
 there with the category `client`.
+
+---
+
+## The Agent Skills
+
+`ai-serve` discovers standard Agent Skills in the project (`.agents/skills`, `.koda/skills`,
+`.claude/skills`, `.rules/skills`) and in the global user directory (`~/.agents/skills`).
+The catalogue is given to the roles and to the agent behind the bus, and the model opens a
+skill with the `read_skill` tool when the task fits it.
+
+```bash
+npx skills add heydamir/unslop -g
+npx skills add felipebasurto/unslop-ui -g
+npx skills add oil-oil/oil-ui -g
+npx skills add GoogleChrome/modern-web-guidance -g
+npx modern-web-guidance@latest install
+
+ai-serve skills
+ai-serve skills --json
+```
+
+The MCP server publishes the catalogue as the resource `ai-serve://skills` and exposes
+`read_skill` as an ordinary MCP tool.
+
+Role-specific packs live in `~/.ai-serve/skills` (or in `skills.dir` from the configuration).
+A file named after a role belongs to that role; `shared.md` belongs to every role. A directory
+with a `SKILL.md` may declare its roles in the frontmatter:
+
+```markdown
+---
+name: House style
+description: The conventions of this project.
+roles: analyzer, director, executor
+---
+```
+
+The text of a role pack is appended to the instructions of the role. The packs are read, never
+written.
 
 ---
 

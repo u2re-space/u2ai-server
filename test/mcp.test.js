@@ -157,6 +157,25 @@ test('the read of a resource answers with its text', async () => {
   assert.match(answer.result.contents[0].text, /read_file/);
 });
 
+test('the skills resource lists the installed Agent Skills', async () => {
+  const root = await tempProject();
+  const skill = path.join(root, '.agents', 'skills', 'oil-ui');
+  await mkdir(skill, { recursive: true });
+  await writeFile(
+    path.join(skill, 'SKILL.md'),
+    '---\nname: oil-ui\ndescription: UI design workflow.\n---\nChoose a direction.',
+    'utf8',
+  );
+  const server = createMcpServer({ root, config: { home: root } });
+  const answer = await server.handle({
+    jsonrpc: '2.0',
+    id: 14,
+    method: 'resources/read',
+    params: { uri: 'ai-serve://skills' },
+  });
+  assert.match(answer.result.contents[0].text, /oil-ui/);
+});
+
 test('the read of an unknown resource is a refusal', async () => {
   const server = createMcpServer({});
   const answer = await server.handle({ jsonrpc: '2.0', id: 10, method: 'resources/read', params: { uri: 'ai-serve://nope' } });

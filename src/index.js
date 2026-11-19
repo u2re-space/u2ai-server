@@ -15,6 +15,16 @@ export { checkNodeVersion, REQUIRED_NODE } from './cli/compatibility.js';
 export { runDoctor, formatDoctor, CHECK_STATES } from './cli/doctor.js';
 
 export * from './config.js';
+export {
+    parseFrontmatter,
+    skillsDirectory,
+    skillDirectories,
+    discoverSkills,
+    buildSkillInstructions,
+    readSkill,
+    loadRolePacks,
+    skillsForRole,
+} from './agent/skills.js';
 
 export {
     buildResponsesBody,

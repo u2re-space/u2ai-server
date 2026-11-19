@@ -34,6 +34,7 @@ import { runCommand, runProgram, scriptLaunch, SHELLS } from './terminal.js';
 import { resolveInside } from '../agent/access.js';
 import { scanWorkspace, formatWorkspace } from './context.js';
 import { collectRoleContext } from '../agent/context.js';
+import { readSkill, skillsDirectory } from '../agent/skills.js';
 import { suggest } from './suggest.js';
 import { screenshotPage } from './browser.js';
 
@@ -249,6 +250,15 @@ export const TOOL_SPECS = Object.freeze({
             role: str('The name of the role. The default is agent.'),
         }, ['task', 'role']),
     },
+    read_skill: {
+        category: 'read',
+        group: 'skills',
+        risk: 'low',
+        description: 'Read an installed Agent Skill by name. Use it before applying a design workflow, polish pass or visual review described by the skill.',
+        parameters: schema({
+            name: str('The name of the skill, for example `oil-ui`.'),
+        }),
+    },
     suggest: {
         category: 'read',
         group: 'suggest',
@@ -339,6 +349,7 @@ function toolSummary(name, data, args = {}) {
         case 'copy_path': return `copied ${data?.source ?? ''} to ${data?.destination ?? ''}`.trim();
         case 'run_command': return `ran ${data?.command ?? 'the command'}`;
         case 'run_script': return `ran ${data?.path ?? 'the script'}`;
+        case 'read_skill': return `read the skill ${args.name ?? ''}`.trim();
         default: return `ran ${name}`;
     }
 }
@@ -511,6 +522,7 @@ const GROUP_FLAGS = Object.freeze({
     shell: 'terminal',
     workspace: 'workspace',
     suggest: 'suggest',
+    skills: 'skills',
     browser: 'browser',
 });
 
@@ -688,6 +700,16 @@ export async function executeTool(name, args = {}, { root, config = null, signal
                 home: config?.home ?? null,
             });
             return { text: context.text, data: context };
+        },
+        read_skill: async () => {
+            const extraDirs = skillsDirectory(config) ? [skillsDirectory(config)] : [];
+            const skill = await readSkill(params.name, root, { extraDirs });
+            if (!skill) throw new Error(`There is no skill named ${params.name}.`);
+            const head = skill.description ? `${skill.description}\n\n` : '';
+            return {
+                text: `# ${skill.name}\n\n${head}${skill.body}`,
+                data: { name: skill.name, description: skill.description, path: skill.path },
+            };
         },
         suggest: async () => {
             const out = await suggest({

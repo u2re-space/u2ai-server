@@ -11,6 +11,7 @@ export const COMMAND_NAMES = Object.freeze([
     'serve',
     'mcp',
     'tools',
+    'skills',
     'agent',
     'complete',
     'services',
@@ -42,6 +43,7 @@ Commands:
   serve                Run the bus, the HTTP bridge and the MCP server. Writes serve.json.
   mcp                  Run the MCP server only: stdio by default, HTTP with --http.
   tools                List the tools of the package (name, category, risk).
+  skills               List the installed Agent Skills of the project and the user.
   agent <task>         Run a one-off task as an AI agent.
   complete             Print a one-off completion for a file and a line.
                        Use --file <path> and --line <n> (1-based).

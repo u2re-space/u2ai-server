@@ -27,6 +27,7 @@ import { createMcpServer, startHttpServer, newMcpToken } from './server/mcp.js';
 import { startStdioServer } from './server/stdio.js';
 import { createClient } from './openai/client.js';
 import { completeAtCursor } from './agent/autocomplete.js';
+import { discoverSkills, skillsDirectory } from './agent/skills.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed } from './tools/tools.js';
 import { normalizeServer, listServices, createToolProxy } from './client/proxy.js';
 import { ROLE_NAMES, runRole, runAgent } from './roles/index.js';
@@ -542,6 +543,43 @@ async function commandTools(opts) {
 }
 
 /**
+ * The `skills` command: the installed Agent Skills of the project and the user.
+ * @param {object} opts
+ * @returns {Promise<number>}
+ * @ai.hint io
+ */
+async function commandSkills(opts) {
+    const cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
+    let config = null;
+    try {
+        config = await loadConfig({ configPath: opts.configPath, cwd });
+    } catch {
+        // The catalogue does not need a valid configuration: the standard directories are enough.
+    }
+    const skillDir = skillsDirectory(config);
+    const skills = await discoverSkills(cwd, {
+        extraDirs: skillDir ? [skillDir] : [],
+    });
+    const list = skills.map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        path: skill.path,
+    }));
+    if (opts.json) {
+        console.log(JSON.stringify(list, null, 2));
+        return EXIT.ok;
+    }
+    if (!list.length) {
+        console.log('No skills found. Install one with `npx skills add <package> -g`.');
+        return EXIT.ok;
+    }
+    for (const skill of list) {
+        console.log(`${skill.name.padEnd(24)} ${skill.description || 'no description'}`);
+    }
+    return EXIT.ok;
+}
+
+/**
  * The `complete` command: one completion for a file and a line, printed to the stdout.
  *
  * The cursor is at the end of the line: the command continues the line, as the Tab of the
@@ -827,6 +865,9 @@ export async function main(argv = process.argv.slice(2), { renderer: given = nul
     }
     if (opts.command === 'tools') {
         return await commandTools(opts);
+    }
+    if (opts.command === 'skills') {
+        return await commandSkills(opts);
     }
     if (opts.command === 'complete') {
         return await commandComplete(opts);

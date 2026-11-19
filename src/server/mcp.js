@@ -34,6 +34,7 @@ import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { TOOL_SPECS, TOOL_NAMES, executeTool, describeTool, toolAllowed } from '../tools/tools.js';
 import { scanWorkspace, formatWorkspace } from '../tools/context.js';
+import { discoverSkills, skillsDirectory } from '../agent/skills.js';
 import { checkToken, readJsonBody } from './http.js';
 
 /** The version of the protocol the server speaks first. */
@@ -57,6 +58,7 @@ export const MCP_ERROR = Object.freeze({
 export const MCP_RESOURCES = Object.freeze([
     Object.freeze({ uri: 'ai-serve://config', name: 'Configuration', description: 'The resolved configuration of the server.', mimeType: 'application/json' }),
     Object.freeze({ uri: 'ai-serve://tools', name: 'Tools', description: 'The catalog of the tools of the server.', mimeType: 'application/json' }),
+    Object.freeze({ uri: 'ai-serve://skills', name: 'Skills', description: 'The installed Agent Skills of the server.', mimeType: 'application/json' }),
     Object.freeze({ uri: 'ai-serve://workspace', name: 'Workspace', description: 'The card of the working directory.', mimeType: 'text/plain' }),
 ]);
 
@@ -223,6 +225,18 @@ export function createMcpServer({
         }
         if (uri === 'ai-serve://tools') {
             return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(listTools(), null, 2) }] };
+        }
+        if (uri === 'ai-serve://skills') {
+            const skillDir = skillsDirectory(config);
+            const skills = await discoverSkills(root, {
+                extraDirs: skillDir ? [skillDir] : [],
+            });
+            const catalogue = skills.map((skill) => ({
+                name: skill.name,
+                description: skill.description,
+                path: skill.path,
+            }));
+            return { contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(catalogue, null, 2) }] };
         }
         if (uri === 'ai-serve://workspace') {
             const card = await scanWorkspace(root, {});

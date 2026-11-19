@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -217,6 +217,23 @@ test('the tools of the run go through the hub', async () => {
     assert.equal(eventsOf(hub, 'tool.exec.done')[0].summary, 'read 1 file');
     assert.equal(eventsOf(hub, 'text.done')[0].text, 'the file says hello');
     assert.equal(hub.finished[0].status, 'completed');
+});
+
+test('the run carries the catalogue of the installed skills', async () => {
+    const skill = path.join(ROOT, '.agents', 'skills', 'oil-ui');
+    await mkdir(skill, { recursive: true });
+    await writeFile(
+        path.join(skill, 'SKILL.md'),
+        '---\nname: oil-ui\ndescription: UI design workflow.\n---\nChoose a direction.',
+        'utf8',
+    );
+    const hub = fakeHub();
+    const client = fakeClient([answerOf('done')]);
+    const agent = createServerAgent({ hub, config: { model: 'test-model' }, client, root: ROOT });
+    const { run, frame } = runOf({ command: 'run', prompt: 'polish the interface' });
+    await agent.start(run, frame);
+    assert.match(client.calls[0].instructions, /oil-ui/);
+    assert.match(client.calls[0].instructions, /read_skill/);
 });
 
 test('the answer of a tool goes back to the model', async () => {

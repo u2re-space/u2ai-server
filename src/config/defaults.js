@@ -132,6 +132,8 @@ export const defaults = {
     terminal: true,
     workspace: true,
     suggest: true,
+    /** Read the installed Agent Skills. */
+    skills: true,
     /** The eye of the service: shoot the page of the working directory. */
     browser: true,
     /** Let the tools write; when false the service is read-only. */
