@@ -370,7 +370,8 @@ test('the Gemini is the alternative to the Kimi and the Kimi is the fallback', (
 });
 
 test('the chain of the house starts with the Kimi', () => {
-    // The Gemini is the alternative, the Kimi answers when it refuses.
+    // The Gemini is the alternative, the Kimi answers when it refuses. The ladder of the
+    // family of the Gemini stands at the end of the chain.
     assert.deepEqual(
         fallbackChain(defaults, 'google/gemini-4-hydrogen'),
         [
@@ -378,6 +379,7 @@ test('the chain of the house starts with the Kimi', () => {
             'moonshotai/kimi-k3.1-pro',
             'moonshotai/kimi-k3',
             'openai/gpt-5.1',
+            'google/gemini-4-neon',
         ],
     );
     // Every other model falls back to the Kimi too.

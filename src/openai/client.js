@@ -29,6 +29,7 @@ import {
     stripRejectedFields,
     toChatBody,
 } from './chat.js';
+import { resolveModelRef } from '../model/refs.js';
 
 /** Statuses worth another try on the same backend. */
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -298,11 +299,11 @@ export async function createClient({ config, env = process.env, signal = null, o
         parallelToolCalls = null,
     } = {}) {
         const body = buildResponsesBody({
-            model, instructions, input, parts, tools, schema, schemaName, schemaChannel, strict,
+            model: resolveModelRef(model ?? config?.model ?? null, config), instructions, input, parts, tools, schema, schemaName, schemaChannel, strict,
             effort, summary, mode, maxOutputTokens, temperature, store, truncation, verbosity, stream,
             previousResponseId, toolChoice, parallelToolCalls,
         });
-        const wantedModel = model ?? config?.model ?? null;
+        const wantedModel = resolveModelRef(model ?? config?.model ?? null, config);
 
         try {
             return await call('responses', {
@@ -353,7 +354,7 @@ export async function createClient({ config, env = process.env, signal = null, o
              * @returns {Promise<object>}
              */
             async create({ model = null, messages = [], stream = false, signal: callSignal = null, onEvent: callEvent = null } = {}) {
-                const body = { model: model ?? config?.model ?? null, messages };
+                const body = { model: resolveModelRef(model ?? config?.model ?? null, config), messages };
                 const answer = await call(CHAT_PATH, {
                     method: 'POST', body, kind: 'text', model: body.model, signal: callSignal,
                     stream: stream ? 'chat' : false, onEvent: callEvent, supports: 'chat',

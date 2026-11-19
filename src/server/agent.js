@@ -32,6 +32,7 @@ import { createClient } from '../openai/client.js';
 import { parseResponse, textPart } from '../openai/responses.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed, toolDefinitions } from '../tools/tools.js';
 import { signRun } from './publish.js';
+import { resolveModelRef } from '../model/refs.js';
 
 /** The commands the agent of the bus answers. */
 export const AGENT_COMMANDS = Object.freeze(['ask', 'run', 'chat']);
@@ -230,7 +231,7 @@ export function createServerAgent({
     const ask = async (run, { input, tools, system, signal }) => {
         const client = await api();
         const raw = await client.responses.create({
-            model: model ?? config?.model ?? null,
+            model: resolveModelRef(model ?? config?.model ?? null, config, { effort: config?.reasoning?.effort ?? null }),
             instructions: system,
             input,
             tools: tools.length ? toolDefinitions(tools) : null,

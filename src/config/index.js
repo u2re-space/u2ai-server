@@ -30,6 +30,7 @@ import {
   ensureHomeDir,
 } from './paths.js';
 import { validateConfig } from './validate.js';
+import { resolveModelRef } from '../model/refs.js';
 
 export {
   defaults,
@@ -103,6 +104,9 @@ export async function loadConfig({ configPath = null, overrides = {}, env = proc
   config.configFiles = [homeConfigFile(home), ...(explicitPath ? [explicitPath] : [])];
 
   validateConfig(config);
+  // The model of the run may name a family or a group of models: the member that fits the
+  // effort of the run answers.
+  config.model = resolveModelRef(config.model, config, { effort: config.reasoning?.effort ?? null }) ?? config.model;
   if (ensureHome) await ensureHomeDir(home);
   return config;
 }

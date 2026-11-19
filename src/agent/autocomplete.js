@@ -24,6 +24,7 @@
 
 import { COMPLETION_WINDOWS, MAX_COMPLETION_CONTEXT_BYTES, MAX_COMPLETION_FRAME_BYTES } from '../shared/protocol.js';
 import { parseResponse } from '../openai/responses.js';
+import { resolveModelRef } from '../model/refs.js';
 
 /** A line over this size is not sent to the model: it is usually a blob, not code. */
 export const MAX_LINE_BYTES = 512 * 1024;
@@ -371,7 +372,9 @@ export async function completeAtCursor({ client, config = null, frame = {}, sign
         language: frame.language,
     });
     const raw = await client.responses.create({
-        model: config?.completion?.model ?? config?.model ?? null,
+        model: resolveModelRef(config?.completion?.model ?? config?.model ?? null, config, {
+            effort: config?.completion?.effort ?? 'low',
+        }),
         instructions: COMPLETION_INSTRUCTIONS,
         input: context.prompt,
         effort: config?.completion?.effort ?? 'low',

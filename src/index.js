@@ -70,6 +70,17 @@ export {
     contextBytes,
     maxOutputFor,
 } from './model/profiles.js';
+export {
+    FAMILY_PREFIX,
+    GROUP_PREFIX,
+    familyName,
+    groupName,
+    familyModels,
+    groupMembers,
+    resolveModelRef,
+    familyLadder,
+    groupLadder,
+} from './model/refs.js';
 
 export {
     PROTOCOL_VERSION,

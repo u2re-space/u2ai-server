@@ -25,6 +25,7 @@
 
 import { parseResponse, textPart } from '../openai/responses.js';
 import { assetPart, scrubDataUrls } from '../shared/data-urls.js';
+import { resolveModelRef, rankPath } from '../model/refs.js';
 import { toolDefinitions, toolCategory } from '../tools/tools.js';
 import { collectRoleContext } from '../agent/context.js';
 import { analyzeTask } from './analyzer.js';
@@ -81,6 +82,9 @@ function clampEffort(effort, maxEffort) {
  * The chain is the role, then `roles.default`, then the top level of the configuration:
  * the role wins, the default of the roles is the middle, and the top level is the last.
  *
+ * The model of the chain may be a family of models (`family:gpt`) or a group of models
+ * (`group:small`): the member that takes the effort of the role and fits its context
+ * answers.
  * @param {object|null} config
  * @param {string} role
  * @returns {{ model: string|null, effort: string|null, summary: string|null, temperature: number|null,
@@ -104,9 +108,15 @@ export function resolveRoleSettings(config = null, role = 'agent') {
         return null;
     };
     const maxTurns = config?.limits?.maxTurns;
+    const effort = clampEffort(pick('effort') ?? config?.reasoning?.effort ?? null, pick('maxEffort'));
+    const context = pick('context');
+    const budget = typeof context === 'string' || Number.isSafeInteger(context) ? context : null;
+    // The place of the family the role answers on: the path of the role of the house.
+    const rank = rankPath(config?.house?.ranks?.roles?.[role])?.[0] ?? null;
+    const model = resolveModelRef(pick('model') ?? config?.model ?? null, config, { effort, context: budget, rank });
     return {
-        model: pick('model') ?? config?.model ?? null,
-        effort: clampEffort(pick('effort') ?? config?.reasoning?.effort ?? null, pick('maxEffort')),
+        model,
+        effort,
         summary: pick('summary') ?? config?.reasoning?.summary ?? null,
         temperature: typeof pick('temperature') === 'number' ? pick('temperature') : null,
         maxOutputTokens: Number.isSafeInteger(pick('maxOutputTokens')) ? pick('maxOutputTokens') : null,

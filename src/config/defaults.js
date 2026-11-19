@@ -29,6 +29,37 @@ export const defaults = {
   maxOutputTokens: null,
   /** Per-model ceilings: { "<model>": { window, maxOutput, ceiling } }. */
   models: {},
+  /**
+   * The families of models: a named list of interchangeable models, from the cheapest to the
+   * most expensive.
+   *
+   * The run answers with the cheapest member of the family that takes the effort the role
+   * asks for, and the rest of the list is the ladder of the budget — the next member answers
+   * when the first one refuses.
+   */
+  modelFamilies: {
+    gpt: ['openai/gpt-6.1-terra', 'openai/gpt-6.2-sol'],
+    gemini: ['google/gemini-4-hydrogen', 'google/gemini-4-neon'],
+    claude: ['anthropic/claude-haiku-5.5', 'anthropic/claude-sonnet-5.5'],
+  },  /**
+   * The groups of models: a named list of models of one kind — the small and the budget
+   * models of the house.
+   *
+   * The members of a group are peers: the one that fits the work answers. A member may name
+   * the limit of the context it is trusted with (`maxContext`, in tokens): the member is not
+   * asked when the context of the role is bigger than the limit.
+   *
+   * A group is named where a model is expected with the prefix `group:`.
+   */
+  modelGroups: {
+    small: [
+      { model: 'openai/gpt-6-luna' },
+      { model: 'anthropic/claude-haiku-5.5', maxContext: 100_000 },
+      { model: 'google/gemini-3.8-flash' },
+      { model: 'minimax/minimax-m3.1-flash' },
+      { model: 'z-ai/glm-5.3-flashx' },
+    ],
+  },
   reasoning: { effort: 'medium', summary: 'auto', mode: null },
   retries: 3,
   timeoutMs: 120_000,
@@ -152,8 +183,13 @@ export const defaults = {
     enabled: true,
     /** Extra tokens the bridge accepts beside the serve token. */
     tokens: [],
-    /** The model of the completion. */
-    model: null,
+    /**
+     * The model of the completion.
+     *
+     * A completion is a small action: the insertion of a few characters. The group of the
+     * small models answers it — the cheapest model that fits the work.
+     */
+    model: 'group:small',
     /** The reasoning effort of the completion. */
     effort: 'low',
   },
@@ -190,6 +226,17 @@ export const defaults = {
    */
   services: [],
 
+  // --- the house of the run ----------------------------------------------------
+  /**
+   * The house of the run: the ranks of the models of the house in their families.
+   *
+   * A path is a list of the places of a family: the role answers on the first place and
+   * steps down to the next one when its work is done.
+   */
+  house: {
+    ranks: { roles: {}, stages: {} },
+  },
+
   // --- roles ----------------------------------------------------------------
   /**
    * Per-role overrides. Model/effort resolution chain:
@@ -202,7 +249,8 @@ export const defaults = {
     director: {},
     executor: {},
     tooler: {},
-    suggester: {},
+    // The suggester answers questions about the project: a small action, a cheap model.
+    suggester: { model: 'group:small' },
   },
 
   /** Extra named roles merged into the role registry at load. */
@@ -245,6 +293,8 @@ export function defaultConfigText() {
       enabled: defaults.completion.enabled,
       model: defaults.completion.model,
     },
+    modelFamilies: structuredClone(defaults.modelFamilies),
+    modelGroups: structuredClone(defaults.modelGroups),
     mcp: {
       enabled: defaults.mcp.enabled,
       transport: defaults.mcp.transport,

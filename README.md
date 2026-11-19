@@ -171,7 +171,7 @@ The order of the sources: the defaults, then `~/.ai-serve/config.json`, then the
   "server": { "host": "127.0.0.1", "port": 0, "approve": "ask" },
   "tools": { "allowWrite": true, "allowTerminal": true, "browser": true },
   "browser": { "engine": "auto", "viewport": { "width": 1440, "height": 900 } },
-  "completion": { "enabled": true, "model": null },
+  "completion": { "enabled": true, "model": "group:small" },
   "mcp": { "enabled": true, "transport": "stdio" },
   "roles": {
     "default": { "model": null, "effort": null },
@@ -224,6 +224,71 @@ same chain.
 
 The key `*` is the chain of every model that has no chain of its own. `fallback.enabled: false`
 turns the chain off.
+
+### The families and the groups of models
+
+A model may be named in the configuration by a family of models or by a group of them.
+
+A family is a named list of interchangeable models, from the cheapest to the most expensive.
+The run answers with the cheapest member of the family that takes the effort of the role, and
+the rest of the list is the ladder of the budget: when the model of the family refuses, the
+next member answers in its place.
+
+```json
+{
+  "modelFamilies": {
+    "gpt": ["openai/gpt-6.1-terra", "openai/gpt-6.2-sol"],
+    "gemini": ["google/gemini-4-hydrogen", "google/gemini-4-neon"],
+    "claude": ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"]
+  }
+}
+```
+
+A group is a named list of models of one kind — the small and the budget models of the house.
+The members of a group are peers: the one that fits the work answers. A member may name the
+limit of the context it is trusted with (`maxContext`, in tokens): the member is not asked when
+the context of the role is bigger than the limit.
+
+```json
+{
+  "modelGroups": {
+    "small": [
+      { "model": "openai/gpt-6-luna" },
+      { "model": "anthropic/claude-haiku-5.5", "maxContext": 100000 },
+      { "model": "google/gemini-3.8-flash" },
+      { "model": "minimax/minimax-m3.1-flash" },
+      { "model": "z-ai/glm-5.3-flashx" }
+    ]
+  }
+}
+```
+
+A family is named with the prefix `family:` and a group with the prefix `group:` — in the
+model of the run, in the model of a role, in the model of the completion:
+
+```json
+{
+  "model": "minimax/minimax-m3.1-flash",
+  "completion": { "model": "group:small" },
+  "roles": { "suggester": { "model": "group:small" } }
+}
+```
+
+The small actions of the service answer on the group of the small models: the tab-completion
+of the editor and the role `suggester` are two of them. The other members of the group are the
+peers of the one that answered: when the model of the group refuses, the next member of the
+group answers in its place.
+
+The list of a family is also a ranking: a path of the ranks says where in its family a role
+answers — the first place of the path, and the next one when its work is done:
+
+```json
+{
+  "house": {
+    "ranks": { "roles": { "suggester": [1, 0] } }
+  }
+}
+```
 
 ### The environment
 

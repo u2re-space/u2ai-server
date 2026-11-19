@@ -20,6 +20,7 @@
 import { createClient } from '../openai/client.js';
 import { parseResponse } from '../openai/responses.js';
 import { collectRoleContext } from './context.js';
+import { resolveModelRef } from '../model/refs.js';
 
 /** The instructions of a callable: answer the task, change nothing. */
 export const CALLABLE_INSTRUCTIONS = 'Answer the task of the caller with the context of the project. Read the context, change nothing, and answer with the result.';
@@ -69,7 +70,7 @@ export async function runCallable({
         home: config?.home ?? null,
     });
     const raw = await api.responses.create({
-        model: model ?? config?.model ?? null,
+        model: resolveModelRef(model ?? config?.model ?? null, config, { effort: config?.reasoning?.effort ?? null }),
         instructions: instructions ?? CALLABLE_INSTRUCTIONS,
         input: callablePrompt({ task, contextText: context.text }),
         schema,

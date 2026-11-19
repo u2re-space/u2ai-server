@@ -47,6 +47,8 @@ Options:
       --port <n>       The port to listen on (default: a free port).
       --cwd <dir>      The working directory of the task.
       --role <name>    The role of the agent: analyzer, director, executor, tooler, suggester.
+  -m, --model <id>      The model of the roles. May be a family of models (family:<name>) or
+                        a group of them (group:<name>).
   -f, --file <path>    The file of the completion.
       --line <n>       The line of the completion (1-based).
       --language <id>  The language of the file (for example js, ts, py).
