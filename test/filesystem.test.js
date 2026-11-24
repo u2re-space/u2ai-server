@@ -318,13 +318,17 @@ test('the copy refuses a tree with a secret', async () => {
 });
 
 test('the catalog holds the file system tools, the terminal ones and the context ones', () => {
-  assert.equal(TOOL_NAMES.length, 15);
+  assert.equal(TOOL_NAMES.length, 16);
   for (const name of TOOL_NAMES) assert.ok(TOOL_SPECS[name], name);
   assert.equal(toolCategory('write_file'), 'write');
   assert.equal(toolCategory('read_file'), 'read');
   assert.equal(toolCategory('run_command'), 'exec');
   assert.equal(toolCategory('scan_workspace'), 'read');
   assert.equal(toolCategory('screenshot'), 'read');
+  // The hand-over to a sub-agent is a read tool of its own group: the flag
+  // `tools.subagent` decides whether the run may hand work over at all.
+  assert.equal(toolCategory('subagent'), 'read');
+  assert.equal(toolRisk('subagent'), 'low');
   assert.equal(toolRisk('delete_file'), 'high');
   assert.equal(toolCategory('nope'), null);
   assert.equal(describeTool('nope'), null);
@@ -335,7 +339,7 @@ test('the catalog holds the file system tools, the terminal ones and the context
 
 test('the definitions of the tools are ready for the request', () => {
   const defs = toolDefinitions();
-  assert.equal(defs.length, 15);
+  assert.equal(defs.length, 16);
   for (const def of defs) {
     assert.equal(def.type, 'function');
     assert.ok(def.name);

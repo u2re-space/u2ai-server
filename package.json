@@ -41,6 +41,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@u2ai/subagent": "file:../u2ai-subagent",
     "terminal-kit": "^3.1.4"
   }
 }

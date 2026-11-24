@@ -22,8 +22,9 @@ ai-serve --help
 | The HTTP part (`src/server/http.js`) | The routes `/health`, `/v1/tools`, `/v1/serves`, `/v1/complete`, `/v1/structure` on the same port and with the same token. |
 | The MCP server (`src/server/mcp.js`) | JSON-RPC 2.0 without an SDK: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`. Stdio or HTTP. |
 | The stdio transports (`src/server/stdio.js`, `src/client/stdio.js`) | The line of JSON that goes in and the line of JSON that comes out: the server of the package and the child process of an outside server. |
-| The tools (`src/tools/*`) | The catalog of the agent: the filesystem, the terminal, the map of the workspace, the suggestions, the eye (the screenshot of the page). |
+| The tools (`src/tools/*`) | The catalog of the agent: the filesystem, the terminal, the map of the workspace, the suggestions, the eye (the screenshot of the page), the hand-over to a sub-agent. |
 | The roles (`src/roles/*`) | The loop of the agent: the analyzer, the director, the executor, the tooler, the suggester. |
+| The sub-agents (`src/agent/subagent.js`) | The hand-over of a bounded task to a separate worker — a thread or a process — that inherits the role, the tools, the rights and the API data of the run. |
 | The OpenAI layer (`src/openai/*`) | The Responses API first, the Chat Completions as the fallback, the rotation of the backends with the retries. |
 | The client (`src/client/*`) | The MCP client (stdio and HTTP) and the proxy of the outside services. |
 | The completion (`src/agent/autocomplete.js`) | The window of the document, the prompt of the completion and the clean-up of the insertion. |
@@ -585,6 +586,9 @@ bus as an event, so the editor sees the life of the run:
 | `reasoning.delta` | A piece of the thinking of the model. |
 | `tool.exec.start` | The tool the model asks for. |
 | `tool.exec.done` | The answer of the tool: `ok`, `summary`, `changes`. |
+| `subagent.start` | A sub-agent starts: the role it inherits and the task of the hand-over. |
+| `subagent.status` | The state of a sub-agent: the turn and the status of the worker. |
+| `subagent.done` | The report of a sub-agent: the turns, whether the files were verified. |
 | `text.done` | The whole answer. |
 | `response.done` | The usage of the tokens and the model that answered. |
 | `warning`, `error` | What went wrong. |
@@ -597,6 +601,44 @@ import { createHub, createServerAgent } from '@u2ai/server';
 const hub = createHub({ token: '<token>', onStart: (run, frame) => agent.start(run, frame) });
 const agent = createServerAgent({ hub, config, root: process.cwd() });
 ```
+
+---
+
+## The hand-over to a sub-agent
+
+A run of the bus meets work that is one bounded piece of another kind — a wide search, a
+scan, a second opinion on a plan. That piece does not belong in the conversation of the
+run: it eats the context of the model and buries the thread of the work. The model hands
+it over with the tool `subagent`:
+
+```json
+{ "role": "executor", "task": "Search every page for a link to the old host and write
+the list into links.md.", "files": ["links.md"] }
+```
+
+The work goes to a **sub-agent**: a separate worker — a thread of the server process by
+default, or a child process of its own with `transport: "process"` — that starts with a
+clean conversation, its own instructions and its own budget of turns. The sub-agent
+carries no role of its own:
+
+| Inherited | From where |
+|---|---|
+| The role | The call: `analyzer` (a look), `director` (a plan), `executor` (the hands). |
+| The tools | The role's mode (`read` or `all`), cut by the tools of the run; the hand-over tool itself is never inherited. |
+| The rights | The working directory of the run; the files it writes are written by the tools of the server. |
+| The API data | The endpoint, the key and the model of the run; a named `model`, `effort` or `apiKey` in the call wins. |
+| The skills | The same catalogue of the installed Agent Skills. |
+
+The tools of the sub-agent go through the **same hub**: a client that holds a tool runs
+it for the sub-agent too, the approval is asked the same way, and the events land in the
+same run — the editor sees the hand-over as it sees a tool. The big texts of the
+hand-over (the instructions of the role) travel in shared memory when the transport is a
+thread: one `SharedArrayBuffer` the parent writes and the thread reads, with the flag of
+cancellation inside it. The hand-over is one level deep: a sub-agent never hands work
+over itself.
+
+The flag `tools.subagent: false` turns the hand-over off: the tool disappears from the
+catalogue and the run does its work in one conversation.
 
 ---
 

@@ -21,7 +21,7 @@
  *
  *   The agent never throws at the bus: a failure is an event and a finished run.
  *
- * @depends openai/client, openai/responses, tools/tools, server/publish
+ * @depends openai/client, openai/responses, tools/tools, server/publish, agent/subagent
  * @usedBy cli, server/serve
  * @exports createServerAgent, AGENT_COMMANDS, AGENT_INSTRUCTIONS
  * @ai.tags agent, server, bus
@@ -34,6 +34,7 @@ import { TOOL_NAMES, TOOL_SPECS, toolAllowed, toolDefinitions } from '../tools/t
 import { signRun } from './publish.js';
 import { resolveModelRef } from '../model/refs.js';
 import { buildSkillInstructions, discoverSkills, skillsDirectory } from '../agent/skills.js';
+import { SERVER_SUBAGENT_NAMES, subagentNote, createSubagentSpawner } from '../agent/subagent.js';
 
 /** The commands the agent of the bus answers. */
 export const AGENT_COMMANDS = Object.freeze(['ask', 'run', 'chat']);
@@ -179,6 +180,51 @@ export function createServerAgent({
     };
 
     /**
+     * The spawner of a sub-agent of one run.
+     *
+     * The tools of the sub-agent are the tools of this server: the sub-agent asks, and
+     * the call goes through the same `runTool` — the holder of the tool runs it, the
+     * approval is asked the same way, and the events land in the same run. The life of
+     * the sub-agent is published to the bus as the events of the run: the editor sees
+     * the hand-over as it sees a tool.
+     *
+     * @param {object} run
+     * @param {object} frame
+     * @param {string[]} tools the tools of the run
+     * @param {string} system the instructions of the run
+     * @returns {(args: object) => Promise<string>}
+     * @ai.hint io
+     */
+    const subagentSpawner = (run, frame, tools, system) => createSubagentSpawner({
+        config,
+        root: rootOf(run, frame),
+        depth: 0,
+        notify: (event) => publish(run.id, event),
+        // The executor of this server: the same road the tools of the run take.
+        executor: async (name, args) => {
+            const result = await runTool(run, frame, name, args, run?.controller?.signal ?? null);
+            if (!result.ok) throw new Error(result.error ?? 'The tool failed.');
+            return result.output;
+        },
+        // The instructions of the inherited role: the words of the run, plus the note
+        // that the sub-agent works alone.
+        instructions: [
+            system,
+            'You work alone in a separate worker: you do not see the conversation of the run.',
+            'Do the bounded work the goal names, write the files it names, and report what you did.',
+        ].filter(Boolean).join('\n\n'),
+        // The tools of a role of the server: the mode of the role, cut by the run.
+        toolNamesFor: (role) => tools.filter((tool) => tool !== 'subagent'),
+        // The tools the executor really runs: the tools of the run.
+        specs: tools,
+        model,
+        effort: config?.reasoning?.effort ?? null,
+        baseURL: config?.baseURL ?? null,
+        apiKey: config?.apiKey ?? null,
+        signal: run?.controller?.signal ?? null,
+    });
+
+    /**
      * Run one tool of the model: the holder of the tool runs it, or the server does.
      * @param {object} run
      * @param {object} frame
@@ -278,6 +324,21 @@ export function createServerAgent({
                 return { text, turns: turn, limitReached: false };
             }
             for (const call of calls) {
+                // The hand-over to a sub-agent: the tool of the catalog says what has to
+                // happen, and the spawner of this run does it. The report of the sub-agent
+                // goes back to the model as the output of the call.
+                if (call.name === 'subagent') {
+                    const report = await subagentSpawner(run, frame, tools, system)(call.arguments ?? {});
+                    const id = call.callId ?? call.id ?? null;
+                    input.push({
+                        type: 'function_call',
+                        call_id: id,
+                        name: call.name,
+                        arguments: call.raw ?? JSON.stringify(call.arguments ?? {}),
+                    });
+                    input.push({ type: 'function_call_output', call_id: id, output: report });
+                    continue;
+                }
                 const result = await runTool(run, frame, call.name, call.arguments ?? {}, signal, changes);
                 const id = call.callId ?? call.id ?? null;
                 input.push({
@@ -375,7 +436,10 @@ export function createServerAgent({
             })
             : [];
         const skillCatalogue = buildSkillInstructions(availableSkills);
-        const system = [baseSystem, skillCatalogue].filter(Boolean).join('\n\n');
+        // The rule of the hand-over: when the run may hand work to a sub-agent, the model
+        // is told when to do it.
+        const handOver = tools.includes('subagent') ? subagentNote(SERVER_SUBAGENT_NAMES) : '';
+        const system = [baseSystem, skillCatalogue, handOver].filter(Boolean).join('\n\n');
         const maxTurns = Number.isSafeInteger(frame?.maxTurns) && frame.maxTurns > 0
             ? frame.maxTurns
             : (config?.limits?.maxTurns ?? 24);

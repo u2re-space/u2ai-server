@@ -259,6 +259,40 @@ export const TOOL_SPECS = Object.freeze({
             name: str('The name of the skill, for example `oil-ui`.'),
         }),
     },
+    subagent: {
+        category: 'read',
+        group: 'subagent',
+        risk: 'low',
+        description: 'Hand one bounded task to a sub-agent: a separate worker (a thread or a process of the '
+            + 'server) that inherits the role of analyzer, director or executor. The sub-agent starts with '
+            + 'a clean conversation, its own instructions, its own tools and its own budget of turns — and '
+            + 'it does not see this one. It inherits your tools and your rights: it works in the same '
+            + 'project, and the files it writes are written by your tools — through the same hub, with the '
+            + 'same approval, so a client that holds a tool runs it for the sub-agent too. By default it '
+            + 'answers with the model of the run over the API of the run; name `model`, `effort` or '
+            + '`apiKey` to run it on another one. Use it when the work is one specific bounded piece: a '
+            + 'wide search, a scan, a second opinion. Name every expected output path in `files`, and '
+            + 'verify that those files appeared on disk.',
+        parameters: schema({
+            role: str('The role the sub-agent inherits: analyzer | director | executor.'),
+            task: str('What that role has to do, in full: the file, what is wrong and what the result '
+                + 'has to be. The sub-agent does not see this conversation.'),
+            reason: str('One sentence: why the work goes to that role.'),
+            files: {
+                type: 'array',
+                description: 'Expected output file paths, relative to the working directory. Include every file the sub-agent must write.',
+                items: str('Path of an expected output file.'),
+            },
+            model: str('The model of the sub-agent, when it is not the model of the run: '
+                + 'an id like openai/gpt-6.1-terra. Empty = the model of the run.'),
+            effort: str('The effort of the reasoning of the sub-agent: minimal | low | medium | high | xhigh. '
+                + 'Empty = the effort of the run.'),
+            apiKey: str('The key of the API of the sub-agent, when it is not the key of the run. '
+                + 'Empty = the key of the run.'),
+            transport: str('Where the sub-agent runs: thread (a worker thread of this process, '
+                + 'the default) or process (a child process of its own, with its own crash domain).'),
+        }, ['reason', 'model', 'effort', 'apiKey', 'transport']),
+    },
     suggest: {
         category: 'read',
         group: 'suggest',
@@ -350,6 +384,7 @@ function toolSummary(name, data, args = {}) {
         case 'run_command': return `ran ${data?.command ?? 'the command'}`;
         case 'run_script': return `ran ${data?.path ?? 'the script'}`;
         case 'read_skill': return `read the skill ${args.name ?? ''}`.trim();
+        case 'subagent': return `handed work to the sub-agent ${args.role ?? ''}`.trim();
         default: return `ran ${name}`;
     }
 }
@@ -523,6 +558,7 @@ const GROUP_FLAGS = Object.freeze({
     workspace: 'workspace',
     suggest: 'suggest',
     skills: 'skills',
+    subagent: 'subagent',
     browser: 'browser',
 });
 
@@ -710,6 +746,12 @@ export async function executeTool(name, args = {}, { root, config = null, signal
                 text: `# ${skill.name}\n\n${head}${skill.body}`,
                 data: { name: skill.name, description: skill.description, path: skill.path },
             };
+        },
+        // The hand-over to a sub-agent is not run here: the tool is wired in the agent of
+        // the run, where the executor, the API data and the events of the run live. A call
+        // that reaches this runner says so instead of doing nothing.
+        subagent: async () => {
+            throw new Error('The tool `subagent` is wired in the agent of the run, not in the catalog.');
         },
         suggest: async () => {
             const out = await suggest({

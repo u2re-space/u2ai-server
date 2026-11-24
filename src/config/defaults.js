@@ -134,6 +134,8 @@ export const defaults = {
     suggest: true,
     /** Read the installed Agent Skills. */
     skills: true,
+    /** Hand a bounded task to a sub-agent: a separate thread or process. */
+    subagent: true,
     /** The eye of the service: shoot the page of the working directory. */
     browser: true,
     /** Let the tools write; when false the service is read-only. */
