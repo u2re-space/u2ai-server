@@ -203,6 +203,65 @@ export { createAccess, ACCESS_LIMITS, EXEC_LIMITS } from './access/index.js';
 export { createPathAccess, DEFAULT_MESSAGES } from './access/paths.js';
 export { createNativeBackend, createNativeFileSystem, createNativeExecutor } from './access/native.js';
 export { createMemoryBackend, createMemoryFileSystem, createMemoryExecutor } from './access/memory.js';
+
+// --- the shared memory, the protocol, the worker and the ramdisk of the house -------------
+export {
+    SHARED_MAGIC,
+    SHARED_VERSION,
+    SHARED_REGIONS,
+    FLAG_CANCEL,
+    sharedAvailable,
+    createSharedBlock,
+    readSharedBlock,
+} from './shared/house/shared.js';
+export {
+    PROTOCOL_VERSION as HOUSE_PROTOCOL_VERSION,
+    SPEC_VERSION as HOUSE_SPEC_VERSION,
+    FRAME as HOUSE_FRAME,
+    createFrame as createHouseFrame,
+    isFrame as isHouseFrame,
+    bytesFrame,
+    base64Frame,
+    bytesOfFrame,
+    bytesOf,
+    base64Bytes,
+    base64Of,
+} from './shared/house/protocol.js';
+export {
+    channelOf,
+    startWorker,
+    runWorker,
+    workerMain,
+    spawnWorker,
+    runWorkerCycle,
+    workerEntry,
+} from './shared/house/worker.js';
+export {
+    RAMDISK_LIMITS,
+    createRamdisk,
+    createRamdiskFileSystem,
+    createSharedByteCache,
+    allocateMemory,
+} from './access/ramdisk.js';
+export {
+    SERVER_WORKER_ENTRY,
+    runServerWorker,
+    spawnServerWorker,
+    createServerWorker,
+} from './agent/worker-runner.js';
+export {
+    SERVER_WORKER_TOOLS,
+    normalizeServerSpec,
+    serverSpecTexts,
+    runServerCycle,
+} from './agent/worker.js';
+export {
+    ROLE_SUBAGENTS,
+    ROLE_SUBAGENT_NAMES,
+    roleSubagentToolNames,
+    roleSubagentNote,
+    createRoleSubagentSpawner,
+} from './agent/role-subagent.js';
 export { formatBytes, formatDuration, truncateText } from './shared/format.js';
 export {
     listFiles,

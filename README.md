@@ -640,6 +640,58 @@ over itself.
 The flag `tools.subagent: false` turns the hand-over off: the tool disappears from the
 catalogue and the run does its work in one conversation.
 
+The CLI agent has the same hand-over: the roles of the CLI — analyzer, director, executor,
+tooler, suggester — may hand one bounded piece of work to a sub-agent too. The sub-agent
+inherits the tools of the run and its rights, and the files it writes are written by the
+tools of this process.
+
+---
+
+## The worker of the house
+
+The sub-agent is the hand-over of a role to another role. The **worker** is the mechanism
+underneath it, and the same mechanism is open to any parent of the house:
+
+```js
+import { runServerWorker } from '@u2ai/server/worker';
+
+const report = await runServerWorker({
+    spec: { role: { name: 'executor', instructions }, goal, files: ['summary.md'] },
+    onCall: (call) => tools.execute(call.name, call.arguments),
+});
+```
+
+| Transport | What it is | What crosses the border |
+|---|---|---|
+| `'thread'` (default) | A worker thread of the parent process. | The spec, the frames of the tools, the **shared memory** and the **bytes**. |
+| `'process'` | A child process of its own (`bin/ai-serve-agent-worker.js`). Its own crash domain, its own env. | The spec, the frames of the tools and the bytes as base64. |
+
+The worker reads its instructions from the shared memory, and it stops when the parent sets
+the flag of cancellation — without a message round trip.
+
+The bytes of the work travel in their own frame — a buffer that moves without a copy — or
+as base64, for the transport that cannot move a buffer.
+
+```js
+import { createSharedBlock } from '@u2ai/server/shared';
+import { bytesFrame } from '@u2ai/server/protocol';
+
+const shared = createSharedBlock({ instructions, notes });
+const { frame, transfer } = bytesFrame(picture, { name: 'hero.png', mime: 'image/png' });
+```
+
+The tmp cache of the house is the ramdisk: a file system in the memory and a cache of bytes
+that the parent and the worker share.
+
+```js
+import { createRamdisk, createRamdiskFileSystem, allocateMemory } from '@u2ai/server/ramdisk';
+
+const block = allocateMemory({ bytes: 4 * 1024 * 1024 * 1024 });  // 4 GB of address space
+```
+
+The block is virtual memory: the pages are taken when the bytes are written, not when the
+block is made.
+
 ---
 
 ## The outside services

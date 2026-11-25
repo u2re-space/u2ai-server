@@ -30,7 +30,9 @@ import { completeAtCursor } from './agent/autocomplete.js';
 import { discoverSkills, skillsDirectory } from './agent/skills.js';
 import { TOOL_NAMES, TOOL_SPECS, toolAllowed } from './tools/tools.js';
 import { normalizeServer, listServices, createToolProxy } from './client/proxy.js';
-import { ROLE_NAMES, runRole, runAgent } from './roles/index.js';
+import { ROLE_NAMES, runRole, runAgent, roleToolNames } from './roles/index.js';
+import { callTool } from './roles/tooler.js';
+import { createRoleSubagentSpawner } from './agent/role-subagent.js';
 import { HELP, COMMAND_NAMES } from './help.js';
 
 const require = createRequire(import.meta.url);
@@ -371,6 +373,38 @@ async function commandAgent(opts) {
     }
 
     try {
+        // The hand-over to a sub-agent: the roles of the CLI may hand one bounded piece
+        // of work to a separate worker. The sub-agent inherits the tools of the run and
+        // its rights: it works in the same project, and the files it writes are written
+        // by the tools of this process.
+        const subagent = createRoleSubagentSpawner({
+            config,
+            root: cwd,
+            depth: 0,
+            notify: (event) => {
+                if (opts.verbose) console.error(`[${event?.type ?? 'subagent'}] ${event?.to ?? ''}`);
+            },
+            // The executor of this process: the tools of the run, with their own rules.
+            executor: async (name, args) => {
+                const result = await callTool(name, args, { root: cwd, config, signal: null });
+                if (!result.ok) throw new Error(result.error ?? 'The tool failed.');
+                return result.text;
+            },
+            // The instructions of the inherited role: the words of the run, plus the note
+            // that the sub-agent works alone.
+            instructions: [
+                'You work alone in a separate worker: you do not see the conversation of the run.',
+                'Do the bounded work the goal names, write the files it names, and report what you did.',
+            ].filter(Boolean).join('\n\n'),
+            // The tools of a role: the mode of the role, cut by the run.
+            toolNamesFor: () => roleToolNames(config, 'executor').filter((tool) => tool !== 'subagent'),
+            // The tools the executor really runs: the tools of the run.
+            specs: roleToolNames(config, 'executor'),
+            model: opts.model ?? config?.model ?? null,
+            effort: config?.reasoning?.effort ?? null,
+            baseURL: config?.baseURL ?? null,
+            apiKey: config?.apiKey ?? null,
+        });
         if (role === 'agent') {
             const out = await runAgent({
                 task,
@@ -379,6 +413,7 @@ async function commandAgent(opts) {
                 root: cwd,
                 model: opts.model ?? null,
                 proxy,
+                subagent,
             });
             if (Array.isArray(out.execution?.changes)) changes.push(...out.execution.changes);
             printAgentResult(out, opts.json);
@@ -390,6 +425,7 @@ async function commandAgent(opts) {
                 root: cwd,
                 model: opts.model ?? null,
                 proxy,
+                subagent,
             });
             if (Array.isArray(out?.changes)) changes.push(...out.changes);
             printRoleResult(role, out, opts.json);

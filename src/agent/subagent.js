@@ -244,6 +244,11 @@ export function createSubagentSpawner({
                 files: expected,
                 rights: { cwd: root, write: true },
                 budget: { maxTurns: Math.min(SERVER_SUBAGENTS[name].maxTurns ?? 8, 8) },
+                // The gate of the write belongs to the agent of the `@u2ai/subagent`:
+                // the sub-agent would have to open it before it writes. The roles of the
+                // server know nothing of that gate, so it is closed here: the sub-agent
+                // writes the files of its goal in the turn it is asked for them.
+                output: { writeGate: false },
                 model: {
                     model: modelOf,
                     baseURL: addressOf,

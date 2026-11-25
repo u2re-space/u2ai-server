@@ -14,8 +14,8 @@
  *   The loop stops at the limit of the turns (`limits.maxTurns`), so a model that keeps
  *   asking for tools does not run forever.
  *
- * @depends openai/responses, tools/tools, agent/context, roles/analyzer, roles/director,
- *          roles/executor, roles/tooler, roles/suggester
+ * @depends openai/responses, tools/tools, agent/context, agent/role-subagent,
+ *          roles/analyzer, roles/director, roles/executor, roles/tooler, roles/suggester
  * @usedBy cli, server/u2ai
  * @exports ROLE_NAMES, ROLE_PROMPTS, ROLE_TOOLS, resolveRoleSettings, roleToolNames,
  *          createRoleAsk, runRole, runAgent
@@ -28,6 +28,7 @@ import { assetPart, scrubDataUrls } from '../shared/data-urls.js';
 import { resolveModelRef, rankPath } from '../model/refs.js';
 import { toolDefinitions, toolCategory } from '../tools/tools.js';
 import { collectRoleContext } from '../agent/context.js';
+import { ROLE_SUBAGENT_NAMES, roleSubagentNote } from '../agent/role-subagent.js';
 import {
     buildSkillInstructions,
     discoverSkills,
@@ -189,10 +190,12 @@ async function callRoleTool(name, args, { root, config = null, signal = null, pr
  * Create the loop of a role: the function that asks the model and runs the tools.
  *
  * @param {{ client: object, config?: object|null, root: string, tools?: string[],
- *           proxy?: object|null,
+ *           proxy?: object|null, subagent?: Function|null,
  *           model?: string|null, effort?: string|null, summary?: string|null,
  *           temperature?: number|null, maxOutputTokens?: number|null, instructions?: string|null,
  *           maxTurns?: number|null, signal?: AbortSignal|null, onEvent?: Function|null }} options
+ *   `subagent` runs the hand-over to a sub-agent: it takes the arguments of the call and
+ *   answers with the report of the sub-agent.
  * @returns {(request: object) => Promise<object>}
  * @exports
  * @ai.hint io
@@ -203,6 +206,7 @@ export function createRoleAsk({
     root,
     tools = [],
     proxy = null,
+    subagent = null,
     model = null,
     effort = null,
     summary = null,
@@ -262,6 +266,22 @@ export function createRoleAsk({
                 };
             }
             for (const call of realCalls) {
+                // The hand-over to a sub-agent: the tool of the catalog says what has to
+                // happen, and the spawner of this role does it. The report of the
+                // sub-agent goes back to the model as the output of the call.
+                if (call.name === 'subagent' && typeof subagent === 'function') {
+                    let report;
+                    try {
+                        report = await subagent(call.arguments ?? {});
+                    } catch (error) {
+                        report = `The sub-agent failed: ${error?.message ?? String(error)}`;
+                    }
+                    calls.push({ name: call.name, arguments: call.arguments, ok: true, text: report });
+                    const subId = call.callId ?? call.id ?? null;
+                    input.push({ type: 'function_call', call_id: subId, name: call.name, arguments: call.raw ?? JSON.stringify(call.arguments ?? {}) });
+                    input.push({ type: 'function_call_output', call_id: subId, output: String(report) });
+                    continue;
+                }
                 const result = await callRoleTool(call.name, call.arguments, { root, config, signal, proxy });
                 calls.push({ name: call.name, arguments: call.arguments, ok: result.ok, text: result.text });
                 const id = call.callId ?? call.id ?? null;
@@ -301,7 +321,10 @@ export function createRoleAsk({
  * @param {string} role the name of the role
  * @param {{ task?: string, analysis?: object|null, plan?: object|null, context?: object|null,
  *           config?: object|null, client: object, root: string, env?: object, signal?: AbortSignal|null,
- *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null, proxy?: object|null }} options
+ *           onEvent?: Function|null, maxTurns?: number|null, model?: string|null, proxy?: object|null,
+ *           subagent?: Function|null }} options
+ *   `subagent` runs the hand-over to a sub-agent. When it is named, the role gets the
+ *   `subagent` tool and the rule that tells it when to hand the work over.
  * @returns {Promise<object>} the answer of the role
  * @exports
  * @ai.hint io
@@ -320,6 +343,7 @@ export async function runRole(role, {
     maxTurns = null,
     model = null,
     proxy = null,
+    subagent = null,
 } = {}) {
     if (!ROLE_NAMES.includes(role)) throw new Error(`There is no role named ${role}.`);
     if (!client) throw new Error('The role needs an API client.');
@@ -336,6 +360,10 @@ export async function runRole(role, {
     }
     const catalog = roleToolNames(config, role);
     const directTools = ROLE_TOOLS[role] === 'none' ? [] : catalog;
+    // The hand-over: when the role may hand the work to a sub-agent, it gets the tool of
+    // the hand-over and the rule that tells it when to use it.
+    const mayHandOver = typeof subagent === 'function' && directTools.length > 0;
+    const handOverTools = mayHandOver ? [...directTools, 'subagent'] : directTools;
     const skillDir = skillsDirectory(config);
     const roleSkillText = await skillsForRole({ dir: skillDir, role });
     const availableSkills = catalog.includes('read_skill')
@@ -350,13 +378,15 @@ export async function runRole(role, {
         ROLE_PROMPTS[role],
         settings.instructions,
         skillInstructions,
+        mayHandOver ? roleSubagentNote(ROLE_SUBAGENT_NAMES) : '',
     ].filter(Boolean).join('\n\n');
     const ask = createRoleAsk({
         client,
         config,
         root,
-        tools: directTools,
+        tools: handOverTools,
         proxy,
+        subagent,
         model: model ?? settings.model,
         effort: settings.effort,
         summary: settings.summary,
