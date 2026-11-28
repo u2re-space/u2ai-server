@@ -9,12 +9,14 @@
     "./shared": "./src/shared/house/shared.js",
     "./protocol": "./src/shared/house/protocol.js",
     "./worker": "./src/shared/house/worker.js",
+    "./code-mode": "./src/shared/house/code-mode.js",
     "./ramdisk": "./src/access/ramdisk.js"
   },
   "bin": {
     "ai-serve": "./bin/ai-serve.js",
     "ai-serve-worker": "./bin/ai-serve-worker.js",
-    "ai-serve-agent-worker": "./bin/ai-serve-agent-worker.js"
+    "ai-serve-agent-worker": "./bin/ai-serve-agent-worker.js",
+    "ai-serve-code-mode-worker": "./bin/ai-serve-code-mode-worker.js"
   },
   "repository": {
     "type": "git",

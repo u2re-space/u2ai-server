@@ -318,7 +318,7 @@ test('the copy refuses a tree with a secret', async () => {
 });
 
 test('the catalog holds the file system tools, the terminal ones and the context ones', () => {
-  assert.equal(TOOL_NAMES.length, 16);
+  assert.equal(TOOL_NAMES.length, 17);
   for (const name of TOOL_NAMES) assert.ok(TOOL_SPECS[name], name);
   assert.equal(toolCategory('write_file'), 'write');
   assert.equal(toolCategory('read_file'), 'read');
@@ -329,6 +329,10 @@ test('the catalog holds the file system tools, the terminal ones and the context
   // `tools.subagent` decides whether the run may hand work over at all.
   assert.equal(toolCategory('subagent'), 'read');
   assert.equal(toolRisk('subagent'), 'low');
+  // Code Mode is a write: the program calls the tools of the server, and the server
+  // writes the files with its own hands.
+  assert.equal(toolCategory('code_mode'), 'write');
+  assert.equal(toolRisk('code_mode'), 'medium');
   assert.equal(toolRisk('delete_file'), 'high');
   assert.equal(toolCategory('nope'), null);
   assert.equal(describeTool('nope'), null);
@@ -339,7 +343,7 @@ test('the catalog holds the file system tools, the terminal ones and the context
 
 test('the definitions of the tools are ready for the request', () => {
   const defs = toolDefinitions();
-  assert.equal(defs.length, 16);
+  assert.equal(defs.length, 17);
   for (const def of defs) {
     assert.equal(def.type, 'function');
     assert.ok(def.name);

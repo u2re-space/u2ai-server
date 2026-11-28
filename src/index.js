@@ -244,6 +244,25 @@ export {
     allocateMemory,
 } from './access/ramdisk.js';
 export {
+    CODE_MODE_VERSION,
+    CODE_MODE_LIMITS,
+    CodeModeError,
+    createCodeModeSpec,
+    normalizeCodeMode,
+    runCodeMode,
+    runCodeModeWorker,
+    codeModeMain,
+    startCodeModeWorker,
+    codeModeEntry,
+} from './shared/house/code-mode.js';
+export {
+    CODE_MODE_TOOL,
+    codeModeToolSpec,
+    codeModeInstruction,
+    createCodeModeRunner,
+    codeModeBudgetFor,
+} from './agent/code-mode.js';
+export {
     SERVER_WORKER_ENTRY,
     runServerWorker,
     spawnServerWorker,

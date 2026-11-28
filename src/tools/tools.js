@@ -37,6 +37,7 @@ import { collectRoleContext } from '../agent/context.js';
 import { readSkill, skillsDirectory } from '../agent/skills.js';
 import { suggest } from './suggest.js';
 import { screenshotPage } from './browser.js';
+import { createCodeModeRunner } from '../agent/code-mode.js';
 
 /** The categories of the tools: they drive the approval. */
 export const TOOL_CATEGORIES = Object.freeze(['read', 'write', 'exec']);
@@ -258,6 +259,29 @@ export const TOOL_SPECS = Object.freeze({
         parameters: schema({
             name: str('The name of the skill, for example `oil-ui`.'),
         }),
+    },
+    code_mode: {
+        category: 'write',
+        group: 'code_mode',
+        risk: 'medium',
+        description: 'Write a JavaScript program and run it in a sandbox, instead of calling the tools one by '
+            + 'one. The program runs in its own worker with its own realm: it has no process, no require and '
+            + 'no network, and it cannot touch the disk by itself — but it may call your tools, and every '
+            + 'call travels back to the server, which runs it with your rights, your rules and your '
+            + 'approval. Use it when the work is a sequence of many calls: reading five files and merging '
+            + 'them is one program, not six round trips. The program may await, and it may return the answer '
+            + 'of the step. Inside it: `await tools.<name>(args)` calls a tool; `catalogue.names` lists the '
+            + 'tools you may call; `fs` is a file system in the memory; `shared` is the shared block of the '
+            + 'run; `allocate(bytes)` gives a block of memory; `console.log` writes to the output of the run. '
+            + 'The program is sandboxed: a loop that never ends is stopped, and a mistake is an error, not a '
+            + 'crash of the server. This tool writes: it needs the approval of a write, and it earns the '
+            + 'budget of the write.',
+        parameters: schema({
+            code: str('The program. The body of an async function: it may await, and it may return the '
+                + 'answer of the step. The tools are called as `await tools.name({ ... })`.'),
+            purpose: str('One sentence: what the program has to do. It is written into the report of the run.'),
+            timeoutMs: nullableInt('How long the program may run, in milliseconds. Null = 60000.'),
+        }, ['purpose', 'timeoutMs']),
     },
     subagent: {
         category: 'read',
@@ -560,6 +584,7 @@ const GROUP_FLAGS = Object.freeze({
     skills: 'skills',
     subagent: 'subagent',
     browser: 'browser',
+    code_mode: 'code_mode',
 });
 
 /**
@@ -752,6 +777,20 @@ export async function executeTool(name, args = {}, { root, config = null, signal
         // that reaches this runner says so instead of doing nothing.
         subagent: async () => {
             throw new Error('The tool `subagent` is wired in the agent of the run, not in the catalog.');
+        },
+        // Code Mode: the program of the model runs in the sandbox, and every tool it
+        // calls travels back here: the server runs it with the rules of the server.
+        code_mode: async () => {
+            const runner = createCodeModeRunner({
+                execute: async (toolName, toolArgs) => {
+                    const out = await executeTool(toolName, toolArgs, { root, config, signal });
+                    return typeof out?.text === 'string' ? out.text : JSON.stringify(out ?? null);
+                },
+                specs: toolDefinitions(),
+                signal,
+            });
+            const answer = await runner(params);
+            return { text: answer, data: { code: params.code ?? '' } };
         },
         suggest: async () => {
             const out = await suggest({

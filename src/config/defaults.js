@@ -136,6 +136,8 @@ export const defaults = {
     skills: true,
     /** Hand a bounded task to a sub-agent: a separate thread or process. */
     subagent: true,
+    /** Write a program and run it in a sandbox, instead of calling the tools one by one. */
+    code_mode: true,
     /** The eye of the service: shoot the page of the working directory. */
     browser: true,
     /** Let the tools write; when false the service is read-only. */
