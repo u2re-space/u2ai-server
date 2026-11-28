@@ -38,6 +38,7 @@ import { readSkill, skillsDirectory } from '../agent/skills.js';
 import { suggest } from './suggest.js';
 import { screenshotPage } from './browser.js';
 import { createCodeModeRunner } from '../agent/code-mode.js';
+import { accessFacilities, accessFacilityDescriptions } from '../access/facility.js';
 
 /** The categories of the tools: they drive the approval. */
 export const TOOL_CATEGORIES = Object.freeze(['read', 'write', 'exec']);
@@ -781,6 +782,27 @@ export async function executeTool(name, args = {}, { root, config = null, signal
         // Code Mode: the program of the model runs in the sandbox, and every tool it
         // calls travels back here: the server runs it with the rules of the server.
         code_mode: async () => {
+            // The program also gets the **access** of the run as a facility: the files and
+            // the commands of the project, with the rules of the access. What it writes
+            // goes through the same gate as `write_file` — the same backup, the same
+            // limits — so a program cannot write where the server may not.
+            const access = accessFacilities({
+                root,
+                config,
+                env: process.env,
+                timeoutMs: 120_000,
+                write: async (rel, content) => {
+                    const out = await writeTextFile({
+                        root,
+                        file: rel,
+                        content,
+                        overwrite: true,
+                        maxBytes: limits.maxWriteBytes ?? 4 * 1024 * 1024,
+                        backupDir,
+                    });
+                    return { path: out?.rel ?? rel, bytes: out?.bytes ?? Buffer.byteLength(content, 'utf8') };
+                },
+            });
             const runner = createCodeModeRunner({
                 execute: async (toolName, toolArgs) => {
                     const out = await executeTool(toolName, toolArgs, { root, config, signal });
@@ -788,6 +810,8 @@ export async function executeTool(name, args = {}, { root, config = null, signal
                 },
                 specs: toolDefinitions(),
                 signal,
+                facilities: access,
+                facilityDescriptions: accessFacilityDescriptions(),
             });
             const answer = await runner(params);
             return { text: answer, data: { code: params.code ?? '' } };

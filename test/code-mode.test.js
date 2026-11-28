@@ -53,6 +53,31 @@ test('a program of the model calls the tools of the server and writes the files'
     }
 });
 
+test('the access of the run is a facility of the server too', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ai-serve-access-'));
+    try {
+        await writeFile(path.join(root, 'a.txt'), 'alpha', 'utf8');
+        const out = await executeTool('code_mode', {
+            code: `
+                const catalog = await library.catalog();
+                const read = await library.call('access.readFile', [{ path: 'a.txt' }]);
+                await library.call('access.writeFile', [{ path: 'out.txt', content: 'from the program' }]);
+                return {
+                    hasAccess: catalog.some((entry) => entry.facility && entry.name === 'access.readFile'),
+                    content: read.content,
+                };
+            `,
+        }, { root, config: { tools: {} } });
+        assert.match(out.text, /The program ran/);
+        assert.match(out.text, /"hasAccess": true/);
+        assert.match(out.text, /alpha/);
+        // The file was written through the gate of the server, with its own backup rules.
+        assert.match(await readFile(path.join(root, 'out.txt'), 'utf8'), /from the program/);
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
+});
+
 test('a program that is not valid says so and writes nothing', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'ai-serve-code-mode-'));
     try {
