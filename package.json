@@ -10,6 +10,7 @@
     "./protocol": "./src/shared/house/protocol.js",
     "./worker": "./src/shared/house/worker.js",
     "./code-mode": "./src/shared/house/code-mode.js",
+    "./code-libraries": "./src/shared/house/code-libraries.js",
     "./ramdisk": "./src/access/ramdisk.js"
   },
   "bin": {
